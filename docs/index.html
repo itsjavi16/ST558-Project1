@@ -241,6 +241,339 @@ $`2`
 [1] "Yes, public school or public college"</code></pre>
 </div>
 </div>
+</section>
+<section id="parsing-api-data" class="level3">
+<h3 class="anchored" data-anchor-id="parsing-api-data">Parsing API Data</h3>
+<p>Firstly, we wanted to confirm we could get the data back from the Census API with a single hardcoded request given in our assignment. This meant working out the request format directly by adding the parameters in the URL along with the attached key, while expecting a successful response, before trying to generalize any of it into a function.</p>
+<p>We stored the API key as an environment variable. The test URL above filters to North Carolina (state:37) and adds SCHL = 24 (a doctorate student) in order to keep the return rows small and easy to verify without a specific format yet. We ran a sanity check with status_code() returning a 200 meaning that the request went through. We still do not know if the data is usable, but that is future problem.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>census_key <span class="ot">&lt;-</span> <span class="fu">Sys.getenv</span>(<span class="st">"CENSUS_KEY"</span>)</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">nzchar</span>(census_key)) {</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stop</span>(<span class="st">"CENSUS_KEY was not found. Add it to your .Renviron file and restart R."</span>)</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="co"># given URL state = 37 (NC)</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>census_url <span class="ot">&lt;-</span> <span class="fu">paste0</span>(</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>  <span class="st">"https://api.census.gov/data/2024/acs/acs1/pums"</span>,</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>  <span class="st">"?get=AGEP,PWGTP,SEX"</span>,</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>  <span class="st">"&amp;for=state:37"</span>,</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>  <span class="st">"&amp;SCHL=24"</span>,</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>  <span class="st">"&amp;key="</span>, census_key</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>test_response <span class="ot">&lt;-</span> <span class="fu">GET</span>(census_url)</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="fu">status_code</span>(test_response)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 200</code></pre>
+</div>
+</div>
+<p>That previous return needed its own function fromJSON(), which parses the API response into a plain R matrix (not even a dataframe). We used the response_to_tibble() to convert a matrix in an easy readable tibble, which shows the first row to actual column names and drops it, returning what as users consider tabular data. Since the request is working, the next step was to build getSingleYearData(), starting with validating each argument before it is ever used to build a request.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>response_to_tibble <span class="ot">&lt;-</span> <span class="cf">function</span>(response) {</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="co"># stop if the API request was unsuccessful</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stop_for_status</span>(response)</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># parse the JSON response</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  api_data <span class="ot">&lt;-</span> <span class="fu">fromJSON</span>(<span class="fu">content</span>(response, <span class="at">as =</span> <span class="st">"text"</span>, <span class="at">encoding =</span> <span class="st">"UTF-8"</span>))</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  <span class="co"># api_data returns as a matrix, we convert it in a tibble first,</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>  <span class="co"># then promote its first row to the real column names and drop that row</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>  api_data <span class="ot">&lt;-</span> <span class="fu">as_tibble</span>(api_data, <span class="at">.name_repair =</span> <span class="st">"unique"</span>)</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  api_data <span class="sc">|&gt;</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>    <span class="fu">setNames</span>(<span class="fu">unlist</span>(<span class="fu">slice</span>(api_data, <span class="dv">1</span>), <span class="at">use.names =</span> <span class="cn">FALSE</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>    <span class="fu">slice</span>(<span class="sc">-</span><span class="dv">1</span>)</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>The year argument must only accept a single value from 2021 through 2024. Anything else fails immediately rather sending a request the API would reject regardless.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># year of survey: single value, defaults to 2024, must be 2021-2024</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>year <span class="ot">&lt;-</span> <span class="dv">2024</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">length</span>(year) <span class="sc">!=</span> <span class="dv">1</span> <span class="sc">||</span> <span class="sc">!</span>year <span class="sc">%in%</span> <span class="dv">2021</span><span class="sc">:</span><span class="dv">2024</span>) {</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stop</span>(<span class="st">"year must be a single value: 2021, 2022, 2023, or 2024"</span>)</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>The numeric variables needed two layers of validation. First, the requested names have to come from the allow list, and PWGTP is forced to be included even if the user does not ask for it, since none of the summary or plotting functions would work properly without it. Also, it requires at least one other numeric variable, because a request that only returned weights would not be useful on its own.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>numeric_vars <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"AGEP"</span>, <span class="st">"PWGTP"</span>)  <span class="co"># default</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="co"># only these six variables are valid choices</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="co"># PWGTP is handled separately below as it is always included, not optional</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>allowed_numeric <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"AGEP"</span>, <span class="st">"GASP"</span>, <span class="st">"GRPIP"</span>, <span class="st">"JWAP"</span>, <span class="st">"JWDP"</span>, <span class="st">"JWMNP"</span>)</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">all</span>(numeric_vars <span class="sc">%in%</span> <span class="fu">c</span>(allowed_numeric, <span class="st">"PWGTP"</span>))) {</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stop</span>(<span class="st">"numeric_vars must be from: "</span>, <span class="fu">paste</span>(allowed_numeric, <span class="at">collapse =</span> <span class="st">", "</span>))</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a><span class="co"># PWGTP must always be returned, whether or not the user asked for it</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span>(<span class="st">"PWGTP"</span> <span class="sc">%in%</span> numeric_vars)) {</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>  numeric_vars <span class="ot">&lt;-</span> <span class="fu">c</span>(numeric_vars, <span class="st">"PWGTP"</span>)</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a><span class="co"># at least one numeric variable besides PWGTP is required</span></span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">length</span>(numeric_vars) <span class="sc">&lt;</span> <span class="dv">2</span>) {</span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stop</span>(<span class="st">"you must request at least one numeric variable besides PWGTP"</span>)</span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>There are two numeric variables, <code>JWAP</code> and <code>JWDP</code> that do not come back directly as numbers, instead they returned as coded time-range variables like “12:00pm to 12:05pm”. In order to convert this into a simple single numeric value, we took the midpoint of each range and returned it as a time-of-day value using the <code>library(hms)</code>. For those labels that show that the person does not have an applicable arrival/departure time come back as NA instead of a formatted time.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># JWAP/JWDP come back as coded time-range labels ("12:00 p.m. to 12:04 p.m.") instead of plain numbers </span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="co"># this function finds  the midpoint of that range as a time value</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="co"># and returns NA for missing/"N/A" labels</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>getTimeMidpoint <span class="ot">&lt;-</span> <span class="cf">function</span>(label) {</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.na</span>(label) <span class="sc">||</span> <span class="fu">grepl</span>(<span class="st">"N/A"</span>, label)) <span class="fu">return</span>(<span class="cn">NA</span>)</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>  label <span class="ot">&lt;-</span> <span class="fu">gsub</span>(<span class="st">"</span><span class="sc">\\</span><span class="st">."</span>, <span class="st">""</span>, label)</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>  times <span class="ot">&lt;-</span> <span class="fu">strsplit</span>(label, <span class="st">" to "</span>)[[<span class="dv">1</span>]]</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>  start_time <span class="ot">&lt;-</span> <span class="fu">parse_date_time</span>(times[<span class="dv">1</span>], <span class="at">orders =</span> <span class="st">"I:M p"</span>)</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>  end_time <span class="ot">&lt;-</span> <span class="fu">parse_date_time</span>(times[<span class="dv">2</span>], <span class="at">orders =</span> <span class="st">"I:M p"</span>)</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (end_time <span class="sc">&lt;</span> start_time) end_time <span class="ot">&lt;-</span> end_time <span class="sc">+</span> <span class="fu">days</span>(<span class="dv">1</span>)</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>  midpoint <span class="ot">&lt;-</span> start_time <span class="sc">+</span> (end_time <span class="sc">-</span> start_time) <span class="sc">/</span> <span class="dv">2</span></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as_hms</span>(midpoint)</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a><span class="fu">getTimeMidpoint</span>(<span class="st">"12:00 p.m. to 12:04 p.m."</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>12:02:00</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="fu">getTimeMidpoint</span>(<span class="st">"N/A (not a worker; worker who worked from home)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] NA</code></pre>
+</div>
+</div>
+<p>The function covertNumericVar() decides per each column, whether a variable needs a time-midpoint calculation or just needs to be forced to a plain number. For example, with the API’s “N” not-applicable code converted to a NA first.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># applies the right conversion to one requested numeric column: JWAP/JWDP</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="co"># get the time-midpoint treatment above </span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="co"># every other numeric variable just becomes a plain number ("N" -&gt; NA)</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>convertNumericVar <span class="ot">&lt;-</span> <span class="cf">function</span>(values, var_name, var_values) {</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (var_name <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"JWAP"</span>, <span class="st">"JWDP"</span>)) {</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    labels <span class="ot">&lt;-</span> var_values[[var_name]]</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>    midpoints <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="cn">NA</span>, <span class="fu">length</span>(values))</span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_along</span>(values)) {</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>      label <span class="ot">&lt;-</span> labels[[values[i]]]</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>      <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(label)) midpoints[i] <span class="ot">&lt;-</span> <span class="fu">as.numeric</span>(<span class="fu">getTimeMidpoint</span>(label))</span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">return</span>(<span class="fu">as_hms</span>(midpoints))</span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>  values[values <span class="sc">==</span> <span class="st">"N"</span>] <span class="ot">&lt;-</span> <span class="cn">NA</span></span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.numeric</span>(values)</span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>We also needed to check for categorical variables go through the same two part validation, given that we needed to restrict to an allowed list, with at least one required SEX is just a sensible default. Unlike PWFTP, there is no categorical variable that gets force-included.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co"># specify categorical variables to return</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="co"># SEX is the default</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>categorical_vars <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"SEX"</span>)</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>allowed_categorical <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"FER"</span>, <span class="st">"HHL"</span>, <span class="st">"SCH"</span>, <span class="st">"SCHL"</span>, <span class="st">"SEX"</span>)</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a><span class="co"># error on any variable name outside the allowed list</span></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">all</span>(categorical_vars <span class="sc">%in%</span> allowed_categorical)) {</span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stop</span>(<span class="st">"categorical_vars must be from: "</span>, <span class="fu">paste</span>(allowed_categorical, <span class="at">collapse =</span> <span class="st">", "</span>))</span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a><span class="co"># at least one categorical variable is required</span></span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">length</span>(categorical_vars) <span class="sc">&lt;</span> <span class="dv">1</span>) {</span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stop</span>(<span class="st">"you must request at least one categorical variable"</span>)</span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>Turning a raw categorical column into something useful is useful for this project so we can convert into a factor with real labels rather than leaving it as bare integer codes. convertCategoricalVar() uses the dictionary we built in the “Parsing Variable Values” section.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Turns a raw categorical column into a factor, using the code -&gt; label</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="co"># lookup pulled from that year's variable dictionary (loadVariableValues())</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>convertCategoricalVar <span class="ot">&lt;-</span> <span class="cf">function</span>(values, var_name, var_values) {</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>  labels <span class="ot">&lt;-</span> var_values[[var_name]]</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">factor</span>(values, <span class="at">levels =</span> <span class="fu">names</span>(labels), <span class="at">labels =</span> <span class="fu">unlist</span>(labels))</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>We are also given that geography level is restricted to exactly one of Region, Division, or State. All three is not a valid level, if the user asks for “all” geographies only makes sense once we have already picked a level.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="co"># level of geography to pull data for</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="co"># State is the default</span></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>geo_level <span class="ot">&lt;-</span> <span class="st">"State"</span></span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>allowed_geo_levels <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"Region"</span>, <span class="st">"Division"</span>, <span class="st">"State"</span>)</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a><span class="co"># exactly one value, must be one of the three levels above</span></span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Note: "All" is NOT valid here (that's only allowed for geo_values, below)</span></span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">length</span>(geo_level) <span class="sc">!=</span> <span class="dv">1</span> <span class="sc">||</span> <span class="sc">!</span>geo_level <span class="sc">%in%</span> allowed_geo_levels) {</span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stop</span>(<span class="st">"geo_level must be exactly one of: "</span>, <span class="fu">paste</span>(allowed_geo_levels, <span class="at">collapse =</span> <span class="st">", "</span>))</span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>Here is when I wanted to throw my laptop from the window. There is this ST/STATE name inconsistency, this time for validating the actual geography codes rather than just building the URL. The dictionary key for state-level data is ST in 2021 and 2022 and STATE from 2023 onward. Unlike geo_level and geo_values, we can allow all as a special case, which ignores the dictionary validation completely rather than trying to match it against all the codes.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co"># default geography value. example default is a single State</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>geo_values <span class="ot">&lt;-</span> <span class="st">"37"</span>  <span class="co"># North Carolina</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">identical</span>(geo_values, <span class="st">"all"</span>)) {</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># dictionary field name for this geography</span></span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>  <span class="co"># STATE used "ST" in the 2021/2022 dictionaries and "STATE" from 2023 on</span></span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>  <span class="co"># REGION/DIVISION didn't change name across years</span></span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>  geo_field <span class="ot">&lt;-</span> <span class="cf">if</span> (geo_level <span class="sc">==</span> <span class="st">"State"</span> <span class="sc">&amp;&amp;</span> year <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">2021</span>, <span class="dv">2022</span>)) {</span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>    <span class="st">"ST"</span></span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>  } <span class="cf">else</span> {</span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">toupper</span>(geo_level)</span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a>  var_values <span class="ot">&lt;-</span> <span class="fu">loadVariableValues</span>(year)</span>
+<span id="cb20-16"><a href="#cb20-16" aria-hidden="true" tabindex="-1"></a>  valid_codes <span class="ot">&lt;-</span> <span class="fu">names</span>(var_values[[geo_field]])</span>
+<span id="cb20-17"><a href="#cb20-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-18"><a href="#cb20-18" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span><span class="fu">all</span>(geo_values <span class="sc">%in%</span> valid_codes)) {</span>
+<span id="cb20-19"><a href="#cb20-19" aria-hidden="true" tabindex="-1"></a>    <span class="fu">stop</span>(<span class="st">"geo_values must be </span><span class="sc">\"</span><span class="st">all</span><span class="sc">\"</span><span class="st"> or one of: "</span>, <span class="fu">paste</span>(valid_codes, <span class="at">collapse =</span> <span class="st">", "</span>))</span>
+<span id="cb20-20"><a href="#cb20-20" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb20-21"><a href="#cb20-21" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>After every piece validated individually above, we created <code>getSingleYearData()</code> which assembles all of it into one big function. Build the request URL from the validated inputs, send it parse the response into a tibble, convert each column to its proper type, and tag the result with a “census” class so the custom summary()/plot() methods we built in Part 2 know how to handle it.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>getSingleYearData <span class="ot">&lt;-</span> <span class="cf">function</span>(<span class="at">year =</span> <span class="dv">2024</span>,</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>                               <span class="at">numeric_vars =</span> <span class="fu">c</span>(<span class="st">"AGEP"</span>),</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>                               <span class="at">categorical_vars =</span> <span class="fu">c</span>(<span class="st">"SEX"</span>),</span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>                               <span class="at">geo_level =</span> <span class="st">"State"</span>,</span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>                               <span class="at">geo_values =</span> <span class="st">"37"</span>) {</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>  <span class="co"># year of survey </span></span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">length</span>(year) <span class="sc">!=</span> <span class="dv">1</span> <span class="sc">||</span> <span class="sc">!</span>year <span class="sc">%in%</span> <span class="dv">2021</span><span class="sc">:</span><span class="dv">2024</span>) {</span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">stop</span>(<span class="st">"year must be a single value: 2021, 2022, 2023, or 2024"</span>)</span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a>  <span class="co"># numeric variables </span></span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a>  allowed_numeric <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"AGEP"</span>, <span class="st">"GASP"</span>, <span class="st">"GRPIP"</span>, <span class="st">"JWAP"</span>, <span class="st">"JWDP"</span>, <span class="st">"JWMNP"</span>)</span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span><span class="fu">all</span>(numeric_vars <span class="sc">%in%</span> allowed_numeric)) {</span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a>    <span class="fu">stop</span>(<span class="st">"numeric_vars must be from: "</span>, <span class="fu">paste</span>(allowed_numeric, <span class="at">collapse =</span> <span class="st">", "</span>))</span>
+<span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb21-17"><a href="#cb21-17" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span>(<span class="st">"PWGTP"</span> <span class="sc">%in%</span> numeric_vars)) {</span>
+<span id="cb21-18"><a href="#cb21-18" aria-hidden="true" tabindex="-1"></a>    numeric_vars <span class="ot">&lt;-</span> <span class="fu">c</span>(numeric_vars, <span class="st">"PWGTP"</span>)</span>
+<span id="cb21-19"><a href="#cb21-19" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb21-20"><a href="#cb21-20" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">length</span>(numeric_vars) <span class="sc">&lt;</span> <span class="dv">2</span>) {</span>
+<span id="cb21-21"><a href="#cb21-21" aria-hidden="true" tabindex="-1"></a>    <span class="fu">stop</span>(<span class="st">"you must request at least one numeric variable besides PWGTP"</span>)</span>
+<span id="cb21-22"><a href="#cb21-22" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb21-23"><a href="#cb21-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-24"><a href="#cb21-24" aria-hidden="true" tabindex="-1"></a>  <span class="co"># categorical variables </span></span>
+<span id="cb21-25"><a href="#cb21-25" aria-hidden="true" tabindex="-1"></a>  allowed_categorical <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"FER"</span>, <span class="st">"HHL"</span>, <span class="st">"SCH"</span>, <span class="st">"SCHL"</span>, <span class="st">"SEX"</span>)</span>
+<span id="cb21-26"><a href="#cb21-26" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span><span class="fu">all</span>(categorical_vars <span class="sc">%in%</span> allowed_categorical)) {</span>
+<span id="cb21-27"><a href="#cb21-27" aria-hidden="true" tabindex="-1"></a>    <span class="fu">stop</span>(<span class="st">"categorical_vars must be from: "</span>, <span class="fu">paste</span>(allowed_categorical, <span class="at">collapse =</span> <span class="st">", "</span>))</span>
+<span id="cb21-28"><a href="#cb21-28" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb21-29"><a href="#cb21-29" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">length</span>(categorical_vars) <span class="sc">&lt;</span> <span class="dv">1</span>) {</span>
+<span id="cb21-30"><a href="#cb21-30" aria-hidden="true" tabindex="-1"></a>    <span class="fu">stop</span>(<span class="st">"you must request at least one categorical variable"</span>)</span>
+<span id="cb21-31"><a href="#cb21-31" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb21-32"><a href="#cb21-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-33"><a href="#cb21-33" aria-hidden="true" tabindex="-1"></a>  <span class="co"># geography level </span></span>
+<span id="cb21-34"><a href="#cb21-34" aria-hidden="true" tabindex="-1"></a>  allowed_geo_levels <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"Region"</span>, <span class="st">"Division"</span>, <span class="st">"State"</span>)</span>
+<span id="cb21-35"><a href="#cb21-35" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">length</span>(geo_level) <span class="sc">!=</span> <span class="dv">1</span> <span class="sc">||</span> <span class="sc">!</span>geo_level <span class="sc">%in%</span> allowed_geo_levels) {</span>
+<span id="cb21-36"><a href="#cb21-36" aria-hidden="true" tabindex="-1"></a>    <span class="fu">stop</span>(<span class="st">"geo_level must be exactly one of: "</span>, <span class="fu">paste</span>(allowed_geo_levels, <span class="at">collapse =</span> <span class="st">", "</span>))</span>
+<span id="cb21-37"><a href="#cb21-37" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb21-38"><a href="#cb21-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-39"><a href="#cb21-39" aria-hidden="true" tabindex="-1"></a>  <span class="co"># lowercase keyword the API's for= expects, regardless of year</span></span>
+<span id="cb21-40"><a href="#cb21-40" aria-hidden="true" tabindex="-1"></a>  geo_url_field <span class="ot">&lt;-</span> <span class="fu">tolower</span>(geo_level)</span>
+<span id="cb21-41"><a href="#cb21-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-42"><a href="#cb21-42" aria-hidden="true" tabindex="-1"></a>  <span class="co"># dictionary/column field name:STATE used "ST" in the 2021/2022</span></span>
+<span id="cb21-43"><a href="#cb21-43" aria-hidden="true" tabindex="-1"></a>  <span class="co"># dictionaries and "STATE" from 2023 on</span></span>
+<span id="cb21-44"><a href="#cb21-44" aria-hidden="true" tabindex="-1"></a>  <span class="co"># REGION/DIVISION kept one name</span></span>
+<span id="cb21-45"><a href="#cb21-45" aria-hidden="true" tabindex="-1"></a>  geo_field <span class="ot">&lt;-</span> <span class="cf">if</span> (geo_level <span class="sc">==</span> <span class="st">"State"</span> <span class="sc">&amp;&amp;</span> year <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">2021</span>, <span class="dv">2022</span>)) {</span>
+<span id="cb21-46"><a href="#cb21-46" aria-hidden="true" tabindex="-1"></a>    <span class="st">"ST"</span></span>
+<span id="cb21-47"><a href="#cb21-47" aria-hidden="true" tabindex="-1"></a>  } <span class="cf">else</span> {</span>
+<span id="cb21-48"><a href="#cb21-48" aria-hidden="true" tabindex="-1"></a>    <span class="fu">toupper</span>(geo_level)</span>
+<span id="cb21-49"><a href="#cb21-49" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb21-50"><a href="#cb21-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-51"><a href="#cb21-51" aria-hidden="true" tabindex="-1"></a>  <span class="co"># geography value(s) </span></span>
+<span id="cb21-52"><a href="#cb21-52" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span><span class="fu">identical</span>(geo_values, <span class="st">"all"</span>)) {</span>
+<span id="cb21-53"><a href="#cb21-53" aria-hidden="true" tabindex="-1"></a>    var_values <span class="ot">&lt;-</span> <span class="fu">loadVariableValues</span>(year)</span>
+<span id="cb21-54"><a href="#cb21-54" aria-hidden="true" tabindex="-1"></a>    valid_codes <span class="ot">&lt;-</span> <span class="fu">names</span>(var_values[[geo_field]])</span>
+<span id="cb21-55"><a href="#cb21-55" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (<span class="sc">!</span><span class="fu">all</span>(geo_values <span class="sc">%in%</span> valid_codes)) {</span>
+<span id="cb21-56"><a href="#cb21-56" aria-hidden="true" tabindex="-1"></a>      <span class="fu">stop</span>(<span class="st">"geo_values must be </span><span class="sc">\"</span><span class="st">all</span><span class="sc">\"</span><span class="st"> or one of: "</span>, <span class="fu">paste</span>(valid_codes, <span class="at">collapse =</span> <span class="st">", "</span>))</span>
+<span id="cb21-57"><a href="#cb21-57" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb21-58"><a href="#cb21-58" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb21-59"><a href="#cb21-59" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-60"><a href="#cb21-60" aria-hidden="true" tabindex="-1"></a>  <span class="co"># build the request and pull the data </span></span>
+<span id="cb21-61"><a href="#cb21-61" aria-hidden="true" tabindex="-1"></a>  all_vars <span class="ot">&lt;-</span> <span class="fu">c</span>(numeric_vars, categorical_vars)</span>
+<span id="cb21-62"><a href="#cb21-62" aria-hidden="true" tabindex="-1"></a>  geo_value_str <span class="ot">&lt;-</span> <span class="fu">paste</span>(geo_values, <span class="at">collapse =</span> <span class="st">","</span>)</span>
+<span id="cb21-63"><a href="#cb21-63" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-64"><a href="#cb21-64" aria-hidden="true" tabindex="-1"></a>  census_url <span class="ot">&lt;-</span> <span class="fu">paste0</span>(</span>
+<span id="cb21-65"><a href="#cb21-65" aria-hidden="true" tabindex="-1"></a>    <span class="st">"https://api.census.gov/data/"</span>, year, <span class="st">"/acs/acs1/pums"</span>,</span>
+<span id="cb21-66"><a href="#cb21-66" aria-hidden="true" tabindex="-1"></a>    <span class="st">"?get="</span>, <span class="fu">paste</span>(all_vars, <span class="at">collapse =</span> <span class="st">","</span>),</span>
+<span id="cb21-67"><a href="#cb21-67" aria-hidden="true" tabindex="-1"></a>    <span class="st">"&amp;for="</span>, geo_url_field, <span class="st">":"</span>, geo_value_str,</span>
+<span id="cb21-68"><a href="#cb21-68" aria-hidden="true" tabindex="-1"></a>    <span class="st">"&amp;key="</span>, <span class="fu">Sys.getenv</span>(<span class="st">"CENSUS_KEY"</span>)</span>
+<span id="cb21-69"><a href="#cb21-69" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb21-70"><a href="#cb21-70" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-71"><a href="#cb21-71" aria-hidden="true" tabindex="-1"></a>  response <span class="ot">&lt;-</span> <span class="fu">GET</span>(census_url)</span>
+<span id="cb21-72"><a href="#cb21-72" aria-hidden="true" tabindex="-1"></a>  my_tibble <span class="ot">&lt;-</span> <span class="fu">response_to_tibble</span>(response)</span>
+<span id="cb21-73"><a href="#cb21-73" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-74"><a href="#cb21-74" aria-hidden="true" tabindex="-1"></a>  <span class="co"># convert variable types </span></span>
+<span id="cb21-75"><a href="#cb21-75" aria-hidden="true" tabindex="-1"></a>  var_values <span class="ot">&lt;-</span> <span class="fu">loadVariableValues</span>(year)</span>
+<span id="cb21-76"><a href="#cb21-76" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-77"><a href="#cb21-77" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (v <span class="cf">in</span> numeric_vars) {</span>
+<span id="cb21-78"><a href="#cb21-78" aria-hidden="true" tabindex="-1"></a>    my_tibble[[v]] <span class="ot">&lt;-</span> <span class="fu">convertNumericVar</span>(my_tibble[[v]], v, var_values)</span>
+<span id="cb21-79"><a href="#cb21-79" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb21-80"><a href="#cb21-80" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (v <span class="cf">in</span> categorical_vars) {</span>
+<span id="cb21-81"><a href="#cb21-81" aria-hidden="true" tabindex="-1"></a>    my_tibble[[v]] <span class="ot">&lt;-</span> <span class="fu">convertCategoricalVar</span>(my_tibble[[v]], v, var_values)</span>
+<span id="cb21-82"><a href="#cb21-82" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb21-83"><a href="#cb21-83" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-84"><a href="#cb21-84" aria-hidden="true" tabindex="-1"></a>  <span class="co"># tag the class and return </span></span>
+<span id="cb21-85"><a href="#cb21-85" aria-hidden="true" tabindex="-1"></a>  <span class="fu">class</span>(my_tibble) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"census"</span>, <span class="fu">class</span>(my_tibble))</span>
+<span id="cb21-86"><a href="#cb21-86" aria-hidden="true" tabindex="-1"></a>  my_tibble</span>
+<span id="cb21-87"><a href="#cb21-87" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="co"># a normal call should return a census-classed tibble</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>test_data <span class="ot">&lt;-</span> <span class="fu">getSingleYearData</span>(<span class="at">year =</span> <span class="dv">2024</span>, <span class="at">numeric_vars =</span> <span class="st">"AGEP"</span>,</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>                                <span class="at">categorical_vars =</span> <span class="st">"SEX"</span>,</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>                                <span class="at">geo_level =</span> <span class="st">"State"</span>, <span class="at">geo_values =</span> <span class="st">"37"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>New names:
+• `` -&gt; `...1`
+• `` -&gt; `...2`
+• `` -&gt; `...3`
+• `` -&gt; `...4`</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="fu">class</span>(test_data)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] "census"     "tbl_df"     "tbl"        "data.frame"</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>test_data</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 114,270 × 4
+    AGEP PWGTP SEX    state
+   &lt;dbl&gt; &lt;dbl&gt; &lt;fct&gt;  &lt;chr&gt;
+ 1    23    60 Male   37   
+ 2    21    49 Male   37   
+ 3    20    24 Male   37   
+ 4    79    54 Female 37   
+ 5    18    79 Male   37   
+ 6    19    54 Female 37   
+ 7    22    58 Female 37   
+ 8    18    17 Female 37   
+ 9    22    30 Male   37   
+10    67    37 Female 37   
+# ℹ 114,260 more rows</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="co"># invalid year</span></span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="fu">tryCatch</span>(</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">getSingleYearData</span>(<span class="at">year =</span> <span class="dv">2020</span>),</span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">error =</span> <span class="cf">function</span>(e) <span class="fu">cat</span>(<span class="st">"Caught expected error:"</span>, <span class="fu">conditionMessage</span>(e), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Caught expected error: year must be a single value: 2021, 2022, 2023, or 2024 </code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="co"># invalid geo_level ("All" is not allowed as a level, only as a value)</span></span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a><span class="fu">tryCatch</span>(</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">getSingleYearData</span>(<span class="at">geo_level =</span> <span class="st">"All"</span>, <span class="at">geo_values =</span> <span class="st">"all"</span>),</span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">error =</span> <span class="cf">function</span>(e) <span class="fu">cat</span>(<span class="st">"Caught expected error:"</span>, <span class="fu">conditionMessage</span>(e), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Caught expected error: geo_level must be exactly one of: Region, Division, State </code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="co"># geo_values not in the dictionary for that year</span></span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a><span class="fu">tryCatch</span>(</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">getSingleYearData</span>(<span class="at">geo_values =</span> <span class="st">"999"</span>),</span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">error =</span> <span class="cf">function</span>(e) <span class="fu">cat</span>(<span class="st">"Caught expected error:"</span>, <span class="fu">conditionMessage</span>(e), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Caught expected error: geo_values must be "all" or one of: 47, 04, 05, 49, 09, 50, 28, 37, 42, 45, 51, 15, 25, 72, 30, 33, 35, 12, 48, 53, 13, 18, 20, 26, 32, 54, 55, 27, 16, 19, 22, 38, 01, 02, 06, 08, 11, 23, 34, 39, 10, 56, 21, 24, 44, 46, 17, 29, 31, 36, 40, 41 </code></pre>
+</div>
+</div>
 
 
 </section>
