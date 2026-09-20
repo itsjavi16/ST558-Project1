@@ -1,0 +1,23 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Project 1",
+    "section": "",
+    "text": "This project focuses on building R functions which query the U.S Census Berenau’s Public Use Microdata Sample (PUMS) API directly. Our objective is to practice working with REST API content by constructing request URLs, parsing raw JSON responses, and converting the results into useful type datatype."
+  },
+  {
+    "objectID": "index.html#introduction",
+    "href": "index.html#introduction",
+    "title": "Project 1",
+    "section": "",
+    "text": "This project focuses on building R functions which query the U.S Census Berenau’s Public Use Microdata Sample (PUMS) API directly. Our objective is to practice working with REST API content by constructing request URLs, parsing raw JSON responses, and converting the results into useful type datatype."
+  },
+  {
+    "objectID": "index.html#part-1-data-processing",
+    "href": "index.html#part-1-data-processing",
+    "title": "Project 1",
+    "section": "Part 1: Data Processing",
+    "text": "Part 1: Data Processing\n\nParsing Variable Values\n\n# Census variables.json nests value labels under a list named \"item\"\n# this helper unwraps that structure into a simple code aka label list.\nextractItemLabels &lt;- function(values) {\n  if (is.null(values)) {\n    return(list())\n  }\n\n  if (is.list(values) && !is.null(values$item)) {\n    values &lt;- values$item\n  }\n\n  if (is.list(values) && length(values) == 1L && is.list(values[[1]])) {\n    values &lt;- values[[1]]\n  }\n\n  values\n}\n\n\ngetVariableValues &lt;- function(year) {\n  if (!year %in% 2021:2024) {\n    stop(\"Year must be 2021, 2022, 2023, or 2024\")\n  }\n\n  # the state geography variable is named \"ST\" in 2021/2022 and \"STATE\" in 2023/2024 \n  geo_var &lt;- if (year %in% c(2021, 2022)) \"ST\" else \"STATE\"\n\n  # only gets dictionary entries for variables this project actually needs\n  vars_needed &lt;- c(\"AGEP\", \"GASP\", \"GRPIP\", \"JWAP\", \"JWDP\", \"JWMNP\",\n                    \"PWGTP\", \"FER\", \"HHL\", \"SCH\", \"SCHL\", \"SEX\",\n                    geo_var, \"REGION\", \"DIVISION\")\n\n  url &lt;- paste0(\"https://api.census.gov/data/\", year, \"/acs/acs1/pums/variables.json\")\n  resp &lt;- GET(url)\n\n  # simplifyVector = FALSE keeps the JSON's nested list structure intact,\n  # which extractItemLabels() needs to detect \"item\" wrappers below\n  parsed &lt;- fromJSON(rawToChar(resp$content), simplifyVector = FALSE)\n  all_vars &lt;- parsed$variables\n\n  # build the label mapping for each variable we need\n  value_list &lt;- list()\n  for (v in vars_needed) {\n    value_list[[v]] &lt;- extractItemLabels(all_vars[[v]]$values)\n  }\n\n  value_list\n}\n\n\n# Build the variable dictionary once per year and cache it to disk, so we\n# don't hit the Census API every time this document is knit\nif (!file.exists(\"data/variable_values.rds\")) {\n  years &lt;- c(2021, 2022, 2023, 2024)\n  variable_values &lt;- list()\n  for (yr in years) {\n    variable_values[[as.character(yr)]] &lt;- getVariableValues(yr)\n  }\n  dir.create(\"data\", showWarnings = FALSE)  # showWarnings = FALSE: fine if \"data/\" already exists\n  saveRDS(variable_values, \"data/variable_values.rds\")\n}\n\n\n# Loads the cached dictionary for one year a list of code = label\n# mappings, one per variable for use by getSingleYearData()\nloadVariableValues &lt;- function(year) {\n  variable_values &lt;- readRDS(\"data/variable_values.rds\")\n  variable_values[[as.character(year)]]\n}\n\n\n# quick sanity check that the dictionary loaded and looks right\nloadVariableValues(2021)$SCH\n\n$`0`\n[1] \"N/A (less than 3 years old)\"\n\n$`3`\n[1] \"Yes, private school or college or home school\"\n\n$`1`\n[1] \"No, has not attended in the last 3 months\"\n\n$`2`\n[1] \"Yes, public school or public college\""
+  }
+]

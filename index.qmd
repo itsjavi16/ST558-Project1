@@ -1,0 +1,104 @@
+---
+title: "Project 1"
+author: "Javi Brito"
+format: html
+editor: visual
+---
+
+```{r libraries, echo = FALSE, include = FALSE}
+library(tidyverse)
+library(httr)
+library(jsonlite)
+library(dplyr)
+library(tibble)
+library(lubridate)
+library(hms) #supports construction from time values
+```
+
+## Introduction
+
+This project focuses on building R functions which query the U.S Census Berenau's Public Use Microdata Sample (PUMS) API directly. Our objective is to practice working with REST API content by constructing request URLs, parsing raw JSON responses, and converting the results into useful type datatype.
+
+## Part 1: Data Processing
+
+### Parsing Variable Values
+
+```{r extract-item-labels}
+# Census variables.json nests value labels under a list named "item"
+# this helper unwraps that structure into a simple code aka label list.
+extractItemLabels <- function(values) {
+  if (is.null(values)) {
+    return(list())
+  }
+
+  if (is.list(values) && !is.null(values$item)) {
+    values <- values$item
+  }
+
+  if (is.list(values) && length(values) == 1L && is.list(values[[1]])) {
+    values <- values[[1]]
+  }
+
+  values
+}
+```
+
+```{r get-variable-values}
+getVariableValues <- function(year) {
+  if (!year %in% 2021:2024) {
+    stop("Year must be 2021, 2022, 2023, or 2024")
+  }
+
+  # the state geography variable is named "ST" in 2021/2022 and "STATE" in 2023/2024 
+  geo_var <- if (year %in% c(2021, 2022)) "ST" else "STATE"
+
+  # only gets dictionary entries for variables this project actually needs
+  vars_needed <- c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP",
+                    "PWGTP", "FER", "HHL", "SCH", "SCHL", "SEX",
+                    geo_var, "REGION", "DIVISION")
+
+  url <- paste0("https://api.census.gov/data/", year, "/acs/acs1/pums/variables.json")
+  resp <- GET(url)
+
+  # simplifyVector = FALSE keeps the JSON's nested list structure intact,
+  # which extractItemLabels() needs to detect "item" wrappers below
+  parsed <- fromJSON(rawToChar(resp$content), simplifyVector = FALSE)
+  all_vars <- parsed$variables
+
+  # build the label mapping for each variable we need
+  value_list <- list()
+  for (v in vars_needed) {
+    value_list[[v]] <- extractItemLabels(all_vars[[v]]$values)
+  }
+
+  value_list
+}
+```
+
+```{r cache-variable-values}
+# Build the variable dictionary once per year and cache it to disk, so we
+# don't hit the Census API every time this document is knit
+if (!file.exists("data/variable_values.rds")) {
+  years <- c(2021, 2022, 2023, 2024)
+  variable_values <- list()
+  for (yr in years) {
+    variable_values[[as.character(yr)]] <- getVariableValues(yr)
+  }
+  dir.create("data", showWarnings = FALSE)  # showWarnings = FALSE: fine if "data/" already exists
+  saveRDS(variable_values, "data/variable_values.rds")
+}
+```
+
+```{r load-variable-values}
+# Loads the cached dictionary for one year a list of code = label
+# mappings, one per variable for use by getSingleYearData()
+loadVariableValues <- function(year) {
+  variable_values <- readRDS("data/variable_values.rds")
+  variable_values[[as.character(year)]]
+}
+```
+
+```{r sanity-check-SCH}
+# quick sanity check that the dictionary loaded and looks right
+loadVariableValues(2021)$SCH
+```
