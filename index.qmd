@@ -418,3 +418,166 @@ tryCatch(
 )
 ```
 
+### Combining Years
+
+```{r combine-years-data}
+combineYearsData <- function(years,
+                              numeric_vars = c("AGEP"),
+                              categorical_vars = c("SEX"),
+                              geo_level = "State",
+                              geo_values = "37") {
+
+  # checks years the same way getSingleYearData() validates a single
+  # year, but allow more than one value here
+  if (length(years) < 1 || any(!years %in% 2021:2024)) {
+    stop("years must contain one or more of 2021, 2022, 2023, or 2024")
+  }
+  years <- unique(years)
+
+  # pull one year at a time by reusing getSingleYearData() 
+  # takes the "census" class before combining so bind_rows() treats each piece as plain tibble
+  # and tag on a year column so we don't losec count on the rows came from which year once everything # is stacked together
+  all_years <- lapply(years, function(yr) {
+    one_year <- getSingleYearData(
+      year = yr,
+      numeric_vars = numeric_vars,
+      categorical_vars = categorical_vars,
+      geo_level = geo_level,
+      geo_values = geo_values
+    )
+    class(one_year) <- setdiff(class(one_year), "census")
+    one_year$year <- yr
+    one_year
+  })
+
+  # saves all years into a single tibble, make year an ordered factor so
+  # it displays/plots in chronological 
+  # then re-tag the class now that the combined data is ready to use
+  combined <- bind_rows(all_years)
+  combined$year <- factor(combined$year, levels = as.character(sort(years)))
+  class(combined) <- c("census", class(combined))
+  combined
+}
+```
+
+```{r test-combine-valid}
+combined_test <- combineYearsData(years = c(2024, 2023))
+class(combined_test)
+combined_test
+```
+
+
+```{r test-combine-error-handling}
+# invalid year in the vector
+tryCatch(
+  combineYearsData(years = 2020),
+  error = function(e) cat("Caught expected error:", conditionMessage(e), "\n")
+)
+
+# empty years vector
+tryCatch(
+  combineYearsData(years = integer(0)),
+  error = function(e) cat("Caught expected error:", conditionMessage(e), "\n")
+)
+
+# duplicate years should be silently de-duplicated
+# confirm the row count matches one year's worth of data, not three
+dup_test <- combineYearsData(years = c(2024, 2024, 2024))
+nrow(dup_test)
+```
+
+## Part 2: Write a Generic Function for Summarizing Data
+
+### Generic Functions
+
+```{r explore-generic-dispatch}
+plot.function                        # method used when class = "function"
+getS3method("plot", "data.frame")    # method used when class = "data.frame"
+```
+
+### Numeric Summaries
+
+```{r summary-census}
+summary.census <- function(object, numeric_vars = NULL, categorical_vars = NULL, ...) {
+
+  # weighted summaries require the person-weight column
+  if (!"PWGTP" %in% names(object)) {
+    stop("object must have a PWGTP column to compute weighted summaries")
+  }
+  weight_vector <- object$PWGTP
+
+  # default every numeric column except PWGTP itself (this also naturally
+  # skips JWAP/JWDP, since those are stored as hms/time values, not numeric)
+  if (is.null(numeric_vars)) {
+    is_num <- vapply(object, is.numeric, logical(1))
+    numeric_vars <- setdiff(names(object)[is_num], c("PWGTP", "JWAP", "JWDP"))
+  }
+
+  # default  every factor column, which naturally includes "year" when present
+  if (is.null(categorical_vars)) {
+    is_cat <- vapply(object, is.factor, logical(1))
+    categorical_vars <- names(object)[is_cat]
+  }
+
+  # weighted mean/sd for each numeric variable
+  # Var(X) = E[X^2] - E[X]^2, with weights standing in for the sampling
+  # probabilities each row represents
+  numeric_summary <- list()
+  for (var in numeric_vars) {
+    numeric_vector <- object[[var]]
+    sample_mean <- sum(numeric_vector * weight_vector) / sum(weight_vector)
+    sample_sd <- sqrt(sum(numeric_vector^2 * weight_vector) / sum(weight_vector) - sample_mean^2)
+    numeric_summary[[var]] <- list(mean = sample_mean, sd = sample_sd)
+  }
+
+  # weighted counts (estimated population totals, not raw row counts)
+  # for each categorical variable
+  categorical_summary <- list()
+  for (var in categorical_vars) {
+    categorical_summary[[var]] <- tapply(weight_vector, object[[var]], sum)
+  }
+
+  list(numeric = numeric_summary, categorical = categorical_summary)
+}
+```
+
+### Graphical Summaries
+
+```{r plot-census}
+plot.census <- function(x, cat_var, num_var, ...) {
+
+  if (missing(cat_var) || missing(num_var)) {
+    stop("plot.census() needs both a categorical variable (cat_var) and a numeric variable (num_var)")
+  }
+  if (!cat_var %in% names(x)) {
+    stop(cat_var, " is not a column in this data")
+  }
+  if (!num_var %in% names(x)) {
+    stop(num_var, " is not a column in this data")
+  }
+
+  ggplot(x, aes(x = get(cat_var), y = get(num_var), weight = PWGTP)) +
+    geom_boxplot() +
+    labs(x = cat_var, y = num_var, title = paste(num_var, "by", cat_var)) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+```
+
+```{r build-example-data}
+my_census_data <- getSingleYearData(
+  year = 2024,
+  numeric_vars = c("AGEP", "JWMNP"),
+  categorical_vars = c("SEX", "SCHL"),
+  geo_level = "State",
+  geo_values = "37"
+)
+```
+
+```{r summarize-example-data}
+summary(my_census_data)
+summary(my_census_data, numeric_vars = "AGEP", categorical_vars = "SEX")
+```
+
+```{r plot-example-data}
+plot(my_census_data, cat_var = "SEX", num_var = "AGEP")
+```
