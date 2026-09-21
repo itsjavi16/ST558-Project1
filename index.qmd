@@ -1,7 +1,9 @@
 ---
 title: "Project 1"
 author: "Javi Brito"
-format: html
+format: 
+  html:
+    theme: solar
 editor: visual
 ---
 
@@ -388,6 +390,7 @@ getSingleYearData <- function(year = 2024,
 }
 ```
 
+To verify the assembled function actually works end to end we ran it against a real request and inspected both the class and the resulting data directly.
 ```{r test-valid-call}
 # a normal call should return a census-classed tibble
 test_data <- getSingleYearData(year = 2024, numeric_vars = "AGEP",
@@ -397,7 +400,7 @@ class(test_data)
 test_data
 ```
 
-
+Wrapping each bad-input case in tryCatch() lets the document show the exact error message produced without the whole render stopping partway through such as an invalid year, an invalid geography level, and a geography value that does not exist in that year's dictionary all get caught here.
 ```{r test-error-handling}
 # invalid year
 tryCatch(
@@ -420,6 +423,9 @@ tryCatch(
 
 ### Combining Years
 
+Our function getSingleYearData() is only able to return one year at the time, which is not useful when we want to investigate changes overtime. Instead of duplicating any of the request/parsing/conversion logic, we built combineYearData() which calls getSingleData() one per request year and stacks the results together.
+
+This function has a couple of details worth to highlight. Each individual year's tibble returns already tagged with the "census" class, but we strip that off before combining them. The bind_rows() does not need to know about a custom class, and re-tagging happens once, on the final combined result, rather than on each piece. We also attach a year column to each year's data before stacking since once everything is combined there's no way to know which rows came from which year. Finally, I convert year into a factor with its levels explicitly sorted, so that later when this combined data gets passed to plot() or summary(), years come out in chronological order rather than however bind_rows() stacked them.
 ```{r combine-years-data}
 combineYearsData <- function(years,
                               numeric_vars = c("AGEP"),
@@ -460,12 +466,15 @@ combineYearsData <- function(years,
 }
 ```
 
+In testing this function the default arguments for `combineYearsData()` were written as `numeric_vars = c("AGEP", "PWGTP")` and `geo_level = "state"` (lowercase), both of which immediately fail when passed into `getSingleYearData()`. PWGTP is not a valid explicit choice for numeric_vars, as it is automatically added, and geo_level validation is case-sensitive.
+
 ```{r test-combine-valid}
 combined_test <- combineYearsData(years = c(2024, 2023))
 class(combined_test)
 combined_test
 ```
 
+In addition to the two tryCatch() cases below, we wanted to check the quieter behavior of the function. Passing the same year multiple times shouldn't throw an error at all, but should just silently collapse to one year's worth of data. This final check here confirms that by comparing row counts instead of expecting an error message.
 
 ```{r test-combine-error-handling}
 # invalid year in the vector
@@ -486,16 +495,22 @@ dup_test <- combineYearsData(years = c(2024, 2024, 2024))
 nrow(dup_test)
 ```
 
+
+
 ## Part 2: Write a Generic Function for Summarizing Data
 
 ### Generic Functions
+
+Before we start writing our customs summary() and plot() behavior from this data, it is good to understand how R works behind the screen and decides which version of a function to actually run. Given both `summary()` and `plot()` are genetic functions in R, meaning that they do not work by themselves, they need to look at the class of the object was passed in and dispatch to a class-specific method.
 
 ```{r explore-generic-dispatch}
 plot.function                        # method used when class = "function"
 getS3method("plot", "data.frame")    # method used when class = "data.frame"
 ```
+The generic function plot() calls UseMethod("plot") and then R chooses plot.function or plot.data.frame depending on the class of the argument. Since the tibbles returned by getSingleYearData() and combineYearData() are tagged to the "census" class, these defined the function named summary.census and plot.census, then if we use summary(my_data) and plot(my_data) to use them instead of just their default versions. 
 
 ### Numeric Summaries
+
 
 ```{r summary-census}
 summary.census <- function(object, numeric_vars = NULL, categorical_vars = NULL, ...) {

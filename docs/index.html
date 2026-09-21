@@ -74,10 +74,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="site_libs/quarto-html/anchor.min.js"></script>
 <link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-49e51e44f424ea8c7044b429bdbbbfe2.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-73d08f1ec3e13e4e2982b78c5de5b9cd.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-ece42c8223ec2bf36298a08f122c9a68.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-25594543a0b82430c9b0b047752f0dde.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "sidebar",
   "copy-button": false,
@@ -514,6 +514,7 @@ $`2`
 <span id="cb21-86"><a href="#cb21-86" aria-hidden="true" tabindex="-1"></a>  my_tibble</span>
 <span id="cb21-87"><a href="#cb21-87" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<p>To verify the assembled function actually works end to end we ran it against a real request and inspected both the class and the resulting data directly.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="co"># a normal call should return a census-classed tibble</span></span>
 <span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>test_data <span class="ot">&lt;-</span> <span class="fu">getSingleYearData</span>(<span class="at">year =</span> <span class="dv">2024</span>, <span class="at">numeric_vars =</span> <span class="st">"AGEP"</span>,</span>
@@ -548,6 +549,7 @@ $`2`
 # ℹ 114,260 more rows</code></pre>
 </div>
 </div>
+<p>Wrapping each bad-input case in tryCatch() lets the document show the exact error message produced without the whole render stopping partway through such as an invalid year, an invalid geography level, and a geography value that does not exist in that year’s dictionary all get caught here.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="co"># invalid year</span></span>
 <span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="fu">tryCatch</span>(</span>
@@ -577,6 +579,8 @@ $`2`
 </section>
 <section id="combining-years" class="level3">
 <h3 class="anchored" data-anchor-id="combining-years">Combining Years</h3>
+<p>Our function getSingleYearData() is only able to return one year at the time, which is not useful when we want to investigate changes overtime. Instead of duplicating any of the request/parsing/conversion logic, we built combineYearData() which calls getSingleData() one per request year and stacks the results together.</p>
+<p>This function has a couple of details worth to highlight. Each individual year’s tibble returns already tagged with the “census” class, but we strip that off before combining them. The bind_rows() does not need to know about a custom class, and re-tagging happens once, on the final combined result, rather than on each piece. We also attach a year column to each year’s data before stacking since once everything is combined there’s no way to know which rows came from which year. Finally, I convert year into a factor with its levels explicitly sorted, so that later when this combined data gets passed to plot() or summary(), years come out in chronological order rather than however bind_rows() stacked them.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>combineYearsData <span class="ot">&lt;-</span> <span class="cf">function</span>(years,</span>
 <span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>                              <span class="at">numeric_vars =</span> <span class="fu">c</span>(<span class="st">"AGEP"</span>),</span>
@@ -616,6 +620,7 @@ $`2`
 <span id="cb34-36"><a href="#cb34-36" aria-hidden="true" tabindex="-1"></a>  combined</span>
 <span id="cb34-37"><a href="#cb34-37" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<p>In testing this function the default arguments for <code>combineYearsData()</code> were written as <code>numeric_vars = c("AGEP", "PWGTP")</code> and <code>geo_level = "state"</code> (lowercase), both of which immediately fail when passed into <code>getSingleYearData()</code>. PWGTP is not a valid explicit choice for numeric_vars, as it is automatically added, and geo_level validation is case-sensitive.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>combined_test <span class="ot">&lt;-</span> <span class="fu">combineYearsData</span>(<span class="at">years =</span> <span class="fu">c</span>(<span class="dv">2024</span>, <span class="dv">2023</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stderr">
@@ -648,6 +653,7 @@ New names:
 # ℹ 226,180 more rows</code></pre>
 </div>
 </div>
+<p>In addition to the two tryCatch() cases below, we wanted to check the quieter behavior of the function. Passing the same year multiple times shouldn’t throw an error at all, but should just silently collapse to one year’s worth of data. This final check here confirms that by comparing row counts instead of expecting an error message.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb41"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="co"># invalid year in the vector</span></span>
 <span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a><span class="fu">tryCatch</span>(</span>
@@ -686,6 +692,7 @@ New names:
 <h2 class="anchored" data-anchor-id="part-2-write-a-generic-function-for-summarizing-data">Part 2: Write a Generic Function for Summarizing Data</h2>
 <section id="generic-functions" class="level3">
 <h3 class="anchored" data-anchor-id="generic-functions">Generic Functions</h3>
+<p>Before we start writing our customs summary() and plot() behavior from this data, it is good to understand how R works behind the screen and decides which version of a function to actually run. Given both <code>summary()</code> and <code>plot()</code> are genetic functions in R, meaning that they do not work by themselves, they need to look at the class of the object was passed in and dispatch to a class-specific method.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb49"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a>plot.function                        <span class="co"># method used when class = "function"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
@@ -718,7 +725,7 @@ New names:
     curve(expr = x, from = from, to = to, xlim = xlim, ylab = ylab, 
         ...)
 }
-&lt;bytecode: 0x00000293ce080460&gt;
+&lt;bytecode: 0x0000019fe9baad28&gt;
 &lt;environment: namespace:graphics&gt;</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb51"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a><span class="fu">getS3method</span>(<span class="st">"plot"</span>, <span class="st">"data.frame"</span>)    <span class="co"># method used when class = "data.frame"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -751,10 +758,11 @@ New names:
         pairs(data.matrix(x), ...)
     }
 }
-&lt;bytecode: 0x00000293ce018f90&gt;
+&lt;bytecode: 0x0000019fe9c1d8f8&gt;
 &lt;environment: namespace:graphics&gt;</code></pre>
 </div>
 </div>
+<p>The generic function plot() calls UseMethod(“plot”) and then R chooses plot.function or plot.data.frame depending on the class of the argument. Since the tibbles returned by getSingleYearData() and combineYearData() are tagged to the “census” class, these defined the function named summary.census and plot.census, then if we use summary(my_data) and plot(my_data) to use them instead of just their default versions.</p>
 </section>
 <section id="numeric-summaries" class="level3">
 <h3 class="anchored" data-anchor-id="numeric-summaries">Numeric Summaries</h3>
