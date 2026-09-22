@@ -149,6 +149,114 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
 <p>This project focuses on building R functions which query the U.S Census Berenau’s Public Use Microdata Sample (PUMS) API directly. Our objective is to practice working with REST API content by constructing request URLs, parsing raw JSON responses, and converting the results into useful type datatype.</p>
 </section>
+<section id="variables" class="level2">
+<h2 class="anchored" data-anchor-id="variables">Variables</h2>
+</section>
+<section id="variables-used" class="level2">
+<h2 class="anchored" data-anchor-id="variables-used">Variables Used</h2>
+<p>This project works with a subset of the American Community Survey PUMS variables, listed below with a short description of what each one represents.</p>
+<p><strong>Numeric variables</strong></p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 44%">
+<col style="width: 55%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>AGEP</code></td>
+<td>Age, in years</td>
+</tr>
+<tr class="even">
+<td><code>GASP</code></td>
+<td>Monthly gas cost for the household</td>
+</tr>
+<tr class="odd">
+<td><code>GRPIP</code></td>
+<td>Gross rent as a percentage of household income (past 12 months)</td>
+</tr>
+<tr class="even">
+<td><code>JWAP</code></td>
+<td>Time of arrival at work, returned as a coded time range and converted here to a single time-of-day value</td>
+</tr>
+<tr class="odd">
+<td><code>JWDP</code></td>
+<td>Time of departure for work, same coded-range treatment as <code>JWAP</code></td>
+</tr>
+<tr class="even">
+<td><code>JWMNP</code></td>
+<td>Travel time to work, in minutes</td>
+</tr>
+<tr class="odd">
+<td><code>PWGTP</code></td>
+<td>Person weight: the number of people in the population this row represents. Always included automatically, since every weighted statistic in this project depends on it</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Categorical variables</strong></p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>FER</code></td>
+<td>Whether the person gave birth within the past 12 months</td>
+</tr>
+<tr class="even">
+<td><code>HHL</code></td>
+<td>Household language: the primary language spoken at home</td>
+</tr>
+<tr class="odd">
+<td><code>SCH</code></td>
+<td>School enrollment status</td>
+</tr>
+<tr class="even">
+<td><code>SCHL</code></td>
+<td>Educational attainment</td>
+</tr>
+<tr class="odd">
+<td><code>SEX</code></td>
+<td>Sex</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Geography</strong></p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 83%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Level</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Region</code></td>
+<td>One of four Census regions: Northeast, Midwest, South, West</td>
+</tr>
+<tr class="even">
+<td><code>Division</code></td>
+<td>A finer breakdown than Region (nine Census divisions total)</td>
+</tr>
+<tr class="odd">
+<td><code>State</code></td>
+<td>Individual U.S. state, identified by FIPS code</td>
+</tr>
+</tbody>
+</table>
+</section>
 <section id="part-1-data-processing" class="level2">
 <h2 class="anchored" data-anchor-id="part-1-data-processing">Part 1: Data Processing</h2>
 <section id="parsing-variable-values" class="level3">
@@ -725,7 +833,7 @@ New names:
     curve(expr = x, from = from, to = to, xlim = xlim, ylab = ylab, 
         ...)
 }
-&lt;bytecode: 0x0000019fe9baad28&gt;
+&lt;bytecode: 0x0000021241d3f0a8&gt;
 &lt;environment: namespace:graphics&gt;</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb51"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a><span class="fu">getS3method</span>(<span class="st">"plot"</span>, <span class="st">"data.frame"</span>)    <span class="co"># method used when class = "data.frame"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -758,7 +866,7 @@ New names:
         pairs(data.matrix(x), ...)
     }
 }
-&lt;bytecode: 0x0000019fe9c1d8f8&gt;
+&lt;bytecode: 0x0000021241d58c78&gt;
 &lt;environment: namespace:graphics&gt;</code></pre>
 </div>
 </div>
@@ -766,6 +874,7 @@ New names:
 </section>
 <section id="numeric-summaries" class="level3">
 <h3 class="anchored" data-anchor-id="numeric-summaries">Numeric Summaries</h3>
+<p>The rows in this data do not each represent one person. The variable PWGT explains how many people a given row actually stands for it, meaning it is a plain mean or count across rows would misrepresent the real population. The summary.census function is built so every statistic it produces is weighted by PWGTP instead of computed on raw values.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb53"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a>summary.census <span class="ot">&lt;-</span> <span class="cf">function</span>(object, <span class="at">numeric_vars =</span> <span class="cn">NULL</span>, <span class="at">categorical_vars =</span> <span class="cn">NULL</span>, ...) {</span>
 <span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a></span>
@@ -812,6 +921,7 @@ New names:
 </section>
 <section id="graphical-summaries" class="level3">
 <h3 class="anchored" data-anchor-id="graphical-summaries">Graphical Summaries</h3>
+<p>This same idea of weighting carries over to plotting by the plot.census function which requires the user to specify one categorical and one numeric variable. Then, it produces a boxplot of the numeric variable across the levels of the categorical one. We set weight = PWGTP inside in the aes() so the boxplot reflects the real weighted population distribution rather than the sampled rows.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb54"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a>plot.census <span class="ot">&lt;-</span> <span class="cf">function</span>(x, cat_var, num_var, ...) {</span>
 <span id="cb54-2"><a href="#cb54-2" aria-hidden="true" tabindex="-1"></a></span>
@@ -831,6 +941,7 @@ New names:
 <span id="cb54-16"><a href="#cb54-16" aria-hidden="true" tabindex="-1"></a>    <span class="fu">theme</span>(<span class="at">axis.text.x =</span> <span class="fu">element_text</span>(<span class="at">angle =</span> <span class="dv">45</span>, <span class="at">hjust =</span> <span class="dv">1</span>))</span>
 <span id="cb54-17"><a href="#cb54-17" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<p>To verify this function we used a small dataset with age and commute time as numeric, sex and educational attainment as categorical for North Carolina in 2024.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb55"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a>my_census_data <span class="ot">&lt;-</span> <span class="fu">getSingleYearData</span>(</span>
 <span id="cb55-2"><a href="#cb55-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">year =</span> <span class="dv">2024</span>,</span>
@@ -955,9 +1066,247 @@ $categorical$SEX
 </div>
 </div>
 </div>
-
-
 </section>
+</section>
+<section id="investigation-household-language-across-geography" class="level2">
+<h2 class="anchored" data-anchor-id="investigation-household-language-across-geography">Investigation: Household Language Across Geography</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb62"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a><span class="co"># one representative state per region, standing in for that whole region</span></span>
+<span id="cb62-2"><a href="#cb62-2" aria-hidden="true" tabindex="-1"></a><span class="co"># so each pull stays the size of a single-state call instead of an entire</span></span>
+<span id="cb62-3"><a href="#cb62-3" aria-hidden="true" tabindex="-1"></a><span class="co"># multi-state region's worth of PUMS microdata</span></span>
+<span id="cb62-4"><a href="#cb62-4" aria-hidden="true" tabindex="-1"></a>state_codes <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"36"</span>, <span class="st">"17"</span>, <span class="st">"37"</span>, <span class="st">"06"</span>)  <span class="co"># New York, Illinois, North Carolina, California</span></span>
+<span id="cb62-5"><a href="#cb62-5" aria-hidden="true" tabindex="-1"></a>region_names <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"Northeast"</span>, <span class="st">"Midwest"</span>, <span class="st">"South"</span>, <span class="st">"West"</span>)</span>
+<span id="cb62-6"><a href="#cb62-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb62-7"><a href="#cb62-7" aria-hidden="true" tabindex="-1"></a>region_data <span class="ot">&lt;-</span> <span class="fu">lapply</span>(state_codes, <span class="cf">function</span>(code) {</span>
+<span id="cb62-8"><a href="#cb62-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">getSingleYearData</span>(</span>
+<span id="cb62-9"><a href="#cb62-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">year =</span> <span class="dv">2024</span>,</span>
+<span id="cb62-10"><a href="#cb62-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">numeric_vars =</span> <span class="st">"AGEP"</span>,</span>
+<span id="cb62-11"><a href="#cb62-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">categorical_vars =</span> <span class="st">"HHL"</span>,</span>
+<span id="cb62-12"><a href="#cb62-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">geo_level =</span> <span class="st">"State"</span>,</span>
+<span id="cb62-13"><a href="#cb62-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">geo_values =</span> code</span>
+<span id="cb62-14"><a href="#cb62-14" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb62-15"><a href="#cb62-15" aria-hidden="true" tabindex="-1"></a>})</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>New names:
+New names:
+New names:
+New names:
+• `` -&gt; `...1`
+• `` -&gt; `...2`
+• `` -&gt; `...3`
+• `` -&gt; `...4`</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb64"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(region_data) <span class="ot">&lt;-</span> region_names</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb65"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb65-1"><a href="#cb65-1" aria-hidden="true" tabindex="-1"></a><span class="co"># summary() called once per region - four different census objects, same</span></span>
+<span id="cb65-2"><a href="#cb65-2" aria-hidden="true" tabindex="-1"></a><span class="co"># categorical_vars to get weighted household-language counts for each</span></span>
+<span id="cb65-3"><a href="#cb65-3" aria-hidden="true" tabindex="-1"></a>region_summaries <span class="ot">&lt;-</span> <span class="fu">lapply</span>(region_data, summary, <span class="at">categorical_vars =</span> <span class="st">"HHL"</span>)</span>
+<span id="cb65-4"><a href="#cb65-4" aria-hidden="true" tabindex="-1"></a>region_summaries</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$Northeast
+$Northeast$numeric
+$Northeast$numeric$AGEP
+$Northeast$numeric$AGEP$mean
+[1] 40.7261
+
+$Northeast$numeric$AGEP$sd
+[1] 23.42529
+
+
+
+$Northeast$categorical
+$Northeast$categorical$HHL
+                   N/A (GQ/vacant)                            Spanish 
+                            678285                            3576269 
+     Other Indo-European languages                       English Only 
+                           2298156                           11530125 
+Asian and Pacific Island languages                     Other Language 
+                           1244587                             539826 
+
+
+
+$Midwest
+$Midwest$numeric
+$Midwest$numeric$AGEP
+$Midwest$numeric$AGEP$mean
+[1] 39.92067
+
+$Midwest$numeric$AGEP$sd
+[1] 23.25273
+
+
+
+$Midwest$categorical
+$Midwest$categorical$HHL
+                   N/A (GQ/vacant)                            Spanish 
+                            292412                            2166455 
+     Other Indo-European languages                       English Only 
+                            910126                            8615426 
+Asian and Pacific Island languages                     Other Language 
+                            504281                             221458 
+
+
+
+$South
+$South$numeric
+$South$numeric$AGEP
+$South$numeric$AGEP$mean
+[1] 39.80583
+
+$South$numeric$AGEP$sd
+[1] 23.28099
+
+
+
+$South$categorical
+$South$categorical$HHL
+                   N/A (GQ/vacant)                            Spanish 
+                            285629                            1236637 
+     Other Indo-European languages                       English Only 
+                            348285                            8757368 
+Asian and Pacific Island languages                     Other Language 
+                            296504                             121601 
+
+
+
+$West
+$West$numeric
+$West$numeric$AGEP
+$West$numeric$AGEP$mean
+[1] 39.22089
+
+$West$numeric$AGEP$sd
+[1] 22.90883
+
+
+
+$West$categorical
+$West$categorical$HHL
+                   N/A (GQ/vacant)                            Spanish 
+                            893305                           13846018 
+     Other Indo-European languages                       English Only 
+                           2544431                           16613117 
+Asian and Pacific Island languages                     Other Language 
+                           4886345                             648047 </code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb67"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a><span class="co"># convert each region's weighted counts to proportions so regions with</span></span>
+<span id="cb67-2"><a href="#cb67-2" aria-hidden="true" tabindex="-1"></a><span class="co"># different total populations are directly comparable. tapply() (used</span></span>
+<span id="cb67-3"><a href="#cb67-3" aria-hidden="true" tabindex="-1"></a><span class="co"># </span><span class="al">NOTE</span><span class="co">: inside summary.census()) returns NA, not 0, for a language level with</span></span>
+<span id="cb67-4"><a href="#cb67-4" aria-hidden="true" tabindex="-1"></a><span class="co"># nobody in it for that region, so treat those as 0 before summing, or</span></span>
+<span id="cb67-5"><a href="#cb67-5" aria-hidden="true" tabindex="-1"></a><span class="co"># sum() would return NA and wipe out every proportion.</span></span>
+<span id="cb67-6"><a href="#cb67-6" aria-hidden="true" tabindex="-1"></a>hhl_proportions <span class="ot">&lt;-</span> <span class="fu">lapply</span>(region_summaries, <span class="cf">function</span>(s) {</span>
+<span id="cb67-7"><a href="#cb67-7" aria-hidden="true" tabindex="-1"></a>  counts <span class="ot">&lt;-</span> s<span class="sc">$</span>categorical<span class="sc">$</span>HHL</span>
+<span id="cb67-8"><a href="#cb67-8" aria-hidden="true" tabindex="-1"></a>  counts[<span class="fu">is.na</span>(counts)] <span class="ot">&lt;-</span> <span class="dv">0</span></span>
+<span id="cb67-9"><a href="#cb67-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">round</span>(counts <span class="sc">/</span> <span class="fu">sum</span>(counts), <span class="dv">3</span>)</span>
+<span id="cb67-10"><a href="#cb67-10" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb67-11"><a href="#cb67-11" aria-hidden="true" tabindex="-1"></a>hhl_proportions</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$Northeast
+                   N/A (GQ/vacant)                            Spanish 
+                             0.034                              0.180 
+     Other Indo-European languages                       English Only 
+                             0.116                              0.580 
+Asian and Pacific Island languages                     Other Language 
+                             0.063                              0.027 
+
+$Midwest
+                   N/A (GQ/vacant)                            Spanish 
+                             0.023                              0.170 
+     Other Indo-European languages                       English Only 
+                             0.072                              0.678 
+Asian and Pacific Island languages                     Other Language 
+                             0.040                              0.017 
+
+$South
+                   N/A (GQ/vacant)                            Spanish 
+                             0.026                              0.112 
+     Other Indo-European languages                       English Only 
+                             0.032                              0.793 
+Asian and Pacific Island languages                     Other Language 
+                             0.027                              0.011 
+
+$West
+                   N/A (GQ/vacant)                            Spanish 
+                             0.023                              0.351 
+     Other Indo-European languages                       English Only 
+                             0.065                              0.421 
+Asian and Pacific Island languages                     Other Language 
+                             0.124                              0.016 </code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb69"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb69-1"><a href="#cb69-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 1: English</span></span>
+<span id="cb69-2"><a href="#cb69-2" aria-hidden="true" tabindex="-1"></a>english_only_label <span class="ot">&lt;-</span> <span class="fu">loadVariableValues</span>(<span class="dv">2024</span>)<span class="sc">$</span>HHL[[<span class="st">"1"</span>]]</span>
+<span id="cb69-3"><a href="#cb69-3" aria-hidden="true" tabindex="-1"></a>english_only_label</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] "English Only"</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb71"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a>non_english_share <span class="ot">&lt;-</span> <span class="fu">sapply</span>(hhl_proportions, <span class="cf">function</span>(p) <span class="dv">1</span> <span class="sc">-</span> p[[english_only_label]])</span>
+<span id="cb71-2"><a href="#cb71-2" aria-hidden="true" tabindex="-1"></a>non_english_share</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Northeast   Midwest     South      West 
+    0.420     0.322     0.207     0.579 </code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb73"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a><span class="co"># plot() called with different inputs too: age spread by language group</span></span>
+<span id="cb73-2"><a href="#cb73-2" aria-hidden="true" tabindex="-1"></a><span class="co"># within a single region (South) </span></span>
+<span id="cb73-3"><a href="#cb73-3" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(region_data<span class="sc">$</span>South, <span class="at">cat_var =</span> <span class="st">"HHL"</span>, <span class="at">num_var =</span> <span class="st">"AGEP"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/plot-south-hhl-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb74"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb74-1"><a href="#cb74-1" aria-hidden="true" tabindex="-1"></a>all_regions <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(<span class="fu">lapply</span>(region_names, <span class="cf">function</span>(nm) {</span>
+<span id="cb74-2"><a href="#cb74-2" aria-hidden="true" tabindex="-1"></a>  one_region <span class="ot">&lt;-</span> region_data[[nm]]</span>
+<span id="cb74-3"><a href="#cb74-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">class</span>(one_region) <span class="ot">&lt;-</span> <span class="fu">setdiff</span>(<span class="fu">class</span>(one_region), <span class="st">"census"</span>)</span>
+<span id="cb74-4"><a href="#cb74-4" aria-hidden="true" tabindex="-1"></a>  one_region<span class="sc">$</span>REGION <span class="ot">&lt;-</span> nm</span>
+<span id="cb74-5"><a href="#cb74-5" aria-hidden="true" tabindex="-1"></a>  one_region</span>
+<span id="cb74-6"><a href="#cb74-6" aria-hidden="true" tabindex="-1"></a>}))</span>
+<span id="cb74-7"><a href="#cb74-7" aria-hidden="true" tabindex="-1"></a>all_regions<span class="sc">$</span>REGION <span class="ot">&lt;-</span> <span class="fu">factor</span>(all_regions<span class="sc">$</span>REGION, <span class="at">levels =</span> region_names)</span>
+<span id="cb74-8"><a href="#cb74-8" aria-hidden="true" tabindex="-1"></a><span class="fu">class</span>(all_regions) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"census"</span>, <span class="fu">class</span>(all_regions))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb75"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb75-1"><a href="#cb75-1" aria-hidden="true" tabindex="-1"></a><span class="co"># vs. age spread by region overall, now that everything's combined</span></span>
+<span id="cb75-2"><a href="#cb75-2" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(all_regions, <span class="at">cat_var =</span> <span class="st">"REGION"</span>, <span class="at">num_var =</span> <span class="st">"AGEP"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/plot-and-summarize-all-regions-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb76"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb76-1"><a href="#cb76-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(all_regions, <span class="at">categorical_vars =</span> <span class="st">"HHL"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$numeric
+$numeric$AGEP
+$numeric$AGEP$mean
+[1] 39.76583
+
+$numeric$AGEP$sd
+[1] 23.14346
+
+
+
+$categorical
+$categorical$HHL
+                   N/A (GQ/vacant)                            Spanish 
+                           2149631                           20825379 
+     Other Indo-European languages                       English Only 
+                           6100998                           45516036 
+Asian and Pacific Island languages                     Other Language 
+                           6931717                            1530932 </code></pre>
+</div>
+</div>
+
+
 </section>
 
 </main> <!-- /main -->

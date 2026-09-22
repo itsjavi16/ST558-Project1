@@ -21,6 +21,42 @@ library(hms) #supports construction from time values
 
 This project focuses on building R functions which query the U.S Census Berenau's Public Use Microdata Sample (PUMS) API directly. Our objective is to practice working with REST API content by constructing request URLs, parsing raw JSON responses, and converting the results into useful type datatype.
 
+## Variables
+
+## Variables Used
+
+This project works with a subset of the American Community Survey PUMS variables, listed below with a short description of what each one represents.
+
+**Numeric variables**
+
+| Variable | Description |
+|--------------------------------|----------------------------------------|
+| `AGEP` | Age, in years |
+| `GASP` | Monthly gas cost for the household |
+| `GRPIP` | Gross rent as a percentage of household income (past 12 months) |
+| `JWAP` | Time of arrival at work, returned as a coded time range and converted here to a single time-of-day value |
+| `JWDP` | Time of departure for work, same coded-range treatment as `JWAP` |
+| `JWMNP` | Travel time to work, in minutes |
+| `PWGTP` | Person weight: the number of people in the population this row represents. Always included automatically, since every weighted statistic in this project depends on it |
+
+**Categorical variables**
+
+| Variable | Description                                             |
+|----------|---------------------------------------------------------|
+| `FER`    | Whether the person gave birth within the past 12 months |
+| `HHL`    | Household language: the primary language spoken at home |
+| `SCH`    | School enrollment status                                |
+| `SCHL`   | Educational attainment                                  |
+| `SEX`    | Sex                                                     |
+
+**Geography**
+
+| Level      | Description                                                 |
+|------------|-------------------------------------------------------------|
+| `Region`   | One of four Census regions: Northeast, Midwest, South, West |
+| `Division` | A finer breakdown than Region (nine Census divisions total) |
+| `State`    | Individual U.S. state, identified by FIPS code              |
+
 ## Part 1: Data Processing
 
 ### Parsing Variable Values
@@ -106,9 +142,11 @@ loadVariableValues(2021)$SCH
 ```
 
 ### Parsing API Data
+
 Firstly, we wanted to confirm we could get the data back from the Census API with a single hardcoded request given in our assignment. This meant working out the request format directly by adding the parameters in the URL along with the attached key, while expecting a successful response, before trying to generalize any of it into a function.
 
 We stored the API key as an environment variable. The test URL above filters to North Carolina (state:37) and adds SCHL = 24 (a doctorate student) in order to keep the return rows small and easy to verify without a specific format yet. We ran a sanity check with status_code() returning a 200 meaning that the request went through. We still do not know if the data is usable, but that is future problem.
+
 ```{r test-basic-request}
 census_key <- Sys.getenv("CENSUS_KEY")
 if (!nzchar(census_key)) {
@@ -147,6 +185,7 @@ response_to_tibble <- function(response) {
     slice(-1)
 }
 ```
+
 The year argument must only accept a single value from 2021 through 2024. Anything else fails immediately rather sending a request the API would reject regardless.
 
 ```{r check-year}
@@ -182,8 +221,7 @@ if (length(numeric_vars) < 2) {
 }
 ```
 
-There are two numeric variables, `JWAP` and `JWDP` that do not come back directly as numbers, instead they returned as coded time-range variables like "12:00pm to 12:05pm". 
-In order to convert this into a simple single numeric value, we took the midpoint of each range and returned it as a time-of-day value using the `library(hms)`. For those labels that show that the person does not have an applicable arrival/departure time come back as NA instead of a formatted time.
+There are two numeric variables, `JWAP` and `JWDP` that do not come back directly as numbers, instead they returned as coded time-range variables like "12:00pm to 12:05pm". In order to convert this into a simple single numeric value, we took the midpoint of each range and returned it as a time-of-day value using the `library(hms)`. For those labels that show that the person does not have an applicable arrival/departure time come back as NA instead of a formatted time.
 
 ```{r get-time-midpoint}
 
@@ -257,7 +295,7 @@ convertCategoricalVar <- function(values, var_name, var_values) {
 }
 ```
 
-We are also given that geography level is restricted to exactly one of Region, Division, or State. All three is not a valid level, if the user asks for "all" geographies only makes sense once we have already picked a level. 
+We are also given that geography level is restricted to exactly one of Region, Division, or State. All three is not a valid level, if the user asks for "all" geographies only makes sense once we have already picked a level.
 
 ```{r check-geo-level}
 # level of geography to pull data for
@@ -391,6 +429,7 @@ getSingleYearData <- function(year = 2024,
 ```
 
 To verify the assembled function actually works end to end we ran it against a real request and inspected both the class and the resulting data directly.
+
 ```{r test-valid-call}
 # a normal call should return a census-classed tibble
 test_data <- getSingleYearData(year = 2024, numeric_vars = "AGEP",
@@ -401,6 +440,7 @@ test_data
 ```
 
 Wrapping each bad-input case in tryCatch() lets the document show the exact error message produced without the whole render stopping partway through such as an invalid year, an invalid geography level, and a geography value that does not exist in that year's dictionary all get caught here.
+
 ```{r test-error-handling}
 # invalid year
 tryCatch(
@@ -426,6 +466,7 @@ tryCatch(
 Our function getSingleYearData() is only able to return one year at the time, which is not useful when we want to investigate changes overtime. Instead of duplicating any of the request/parsing/conversion logic, we built combineYearData() which calls getSingleData() one per request year and stacks the results together.
 
 This function has a couple of details worth to highlight. Each individual year's tibble returns already tagged with the "census" class, but we strip that off before combining them. The bind_rows() does not need to know about a custom class, and re-tagging happens once, on the final combined result, rather than on each piece. We also attach a year column to each year's data before stacking since once everything is combined there's no way to know which rows came from which year. Finally, I convert year into a factor with its levels explicitly sorted, so that later when this combined data gets passed to plot() or summary(), years come out in chronological order rather than however bind_rows() stacked them.
+
 ```{r combine-years-data}
 combineYearsData <- function(years,
                               numeric_vars = c("AGEP"),
@@ -495,8 +536,6 @@ dup_test <- combineYearsData(years = c(2024, 2024, 2024))
 nrow(dup_test)
 ```
 
-
-
 ## Part 2: Write a Generic Function for Summarizing Data
 
 ### Generic Functions
@@ -507,10 +546,12 @@ Before we start writing our customs summary() and plot() behavior from this data
 plot.function                        # method used when class = "function"
 getS3method("plot", "data.frame")    # method used when class = "data.frame"
 ```
-The generic function plot() calls UseMethod("plot") and then R chooses plot.function or plot.data.frame depending on the class of the argument. Since the tibbles returned by getSingleYearData() and combineYearData() are tagged to the "census" class, these defined the function named summary.census and plot.census, then if we use summary(my_data) and plot(my_data) to use them instead of just their default versions. 
+
+The generic function plot() calls UseMethod("plot") and then R chooses plot.function or plot.data.frame depending on the class of the argument. Since the tibbles returned by getSingleYearData() and combineYearData() are tagged to the "census" class, these defined the function named summary.census and plot.census, then if we use summary(my_data) and plot(my_data) to use them instead of just their default versions.
 
 ### Numeric Summaries
 
+The rows in this data do not each represent one person. The variable PWGT explains how many people a given row actually stands for it, meaning it is a plain mean or count across rows would misrepresent the real population. The summary.census function is built so every statistic it produces is weighted by PWGTP instead of computed on raw values.
 
 ```{r summary-census}
 summary.census <- function(object, numeric_vars = NULL, categorical_vars = NULL, ...) {
@@ -558,6 +599,8 @@ summary.census <- function(object, numeric_vars = NULL, categorical_vars = NULL,
 
 ### Graphical Summaries
 
+This same idea of weighting carries over to plotting by the plot.census function which requires the user to specify one categorical and one numeric variable. Then, it produces a boxplot of the numeric variable across the levels of the categorical one. We set weight = PWGTP inside in the aes() so the boxplot reflects the real weighted population distribution rather than the sampled rows.
+
 ```{r plot-census}
 plot.census <- function(x, cat_var, num_var, ...) {
 
@@ -578,6 +621,8 @@ plot.census <- function(x, cat_var, num_var, ...) {
 }
 ```
 
+To verify this function we used a small dataset with age and commute time as numeric, sex and educational attainment as categorical for North Carolina in 2024.
+
 ```{r build-example-data}
 my_census_data <- getSingleYearData(
   year = 2024,
@@ -595,4 +640,78 @@ summary(my_census_data, numeric_vars = "AGEP", categorical_vars = "SEX")
 
 ```{r plot-example-data}
 plot(my_census_data, cat_var = "SEX", num_var = "AGEP")
+```
+
+## Investigation: Household Language Across Geography
+
+```{r investigation-setup}
+# one representative state per region, standing in for that whole region
+# so each pull stays the size of a single-state call instead of an entire
+# multi-state region's worth of PUMS microdata
+state_codes <- c("36", "17", "37", "06")  # New York, Illinois, North Carolina, California
+region_names <- c("Northeast", "Midwest", "South", "West")
+
+region_data <- lapply(state_codes, function(code) {
+  getSingleYearData(
+    year = 2024,
+    numeric_vars = "AGEP",
+    categorical_vars = "HHL",
+    geo_level = "State",
+    geo_values = code
+  )
+})
+names(region_data) <- region_names
+```
+
+```{r region-summaries}
+# summary() called once per region - four different census objects, same
+# categorical_vars to get weighted household-language counts for each
+region_summaries <- lapply(region_data, summary, categorical_vars = "HHL")
+region_summaries
+```
+
+```{r hhl-proportions}
+# convert each region's weighted counts to proportions so regions with
+# different total populations are directly comparable. tapply() (used
+# NOTE: inside summary.census()) returns NA, not 0, for a language level with
+# nobody in it for that region, so treat those as 0 before summing, or
+# sum() would return NA and wipe out every proportion.
+hhl_proportions <- lapply(region_summaries, function(s) {
+  counts <- s$categorical$HHL
+  counts[is.na(counts)] <- 0
+  round(counts / sum(counts), 3)
+})
+hhl_proportions
+```
+
+```{r non-english-share}
+# 1: English
+english_only_label <- loadVariableValues(2024)$HHL[["1"]]
+english_only_label
+
+non_english_share <- sapply(hhl_proportions, function(p) 1 - p[[english_only_label]])
+non_english_share
+```
+
+```{r plot-south-hhl}
+# plot() called with different inputs too: age spread by language group
+# within a single region (South) 
+plot(region_data$South, cat_var = "HHL", num_var = "AGEP")
+```
+
+```{r combine-all-regions}
+all_regions <- bind_rows(lapply(region_names, function(nm) {
+  one_region <- region_data[[nm]]
+  class(one_region) <- setdiff(class(one_region), "census")
+  one_region$REGION <- nm
+  one_region
+}))
+all_regions$REGION <- factor(all_regions$REGION, levels = region_names)
+class(all_regions) <- c("census", class(all_regions))
+```
+
+```{r plot-and-summarize-all-regions}
+# vs. age spread by region overall, now that everything's combined
+plot(all_regions, cat_var = "REGION", num_var = "AGEP")
+summary(all_regions, categorical_vars = "HHL")
 ```
