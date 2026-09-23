@@ -23,8 +23,6 @@ This project focuses on building R functions which query the U.S Census Berenau'
 
 ## Variables
 
-## Variables Used
-
 This project works with a subset of the American Community Survey PUMS variables, listed below with a short description of what each one represents.
 
 **Numeric variables**
@@ -145,7 +143,7 @@ loadVariableValues(2021)$SCH
 
 Firstly, we wanted to confirm we could get the data back from the Census API with a single hardcoded request given in our assignment. This meant working out the request format directly by adding the parameters in the URL along with the attached key, while expecting a successful response, before trying to generalize any of it into a function.
 
-We stored the API key as an environment variable. The test URL above filters to North Carolina (state:37) and adds SCHL = 24 (a doctorate student) in order to keep the return rows small and easy to verify without a specific format yet. We ran a sanity check with status_code() returning a 200 meaning that the request went through. We still do not know if the data is usable, but that is future problem.
+We stored the API key as an environment variable. The test URL above filters to North Carolina (state:37) and adds `SCHL` = 24 (a doctorate student) in order to keep the return rows small and easy to verify without a specific format yet. We ran a sanity check with status_code() returning a 200 meaning that the request went through. We still do not know if the data is usable, but that is future problem.
 
 ```{r test-basic-request}
 census_key <- Sys.getenv("CENSUS_KEY")
@@ -166,7 +164,7 @@ test_response <- GET(census_url)
 status_code(test_response)
 ```
 
-That previous return needed its own function fromJSON(), which parses the API response into a plain R matrix (not even a dataframe). We used the response_to_tibble() to convert a matrix in an easy readable tibble, which shows the first row to actual column names and drops it, returning what as users consider tabular data. Since the request is working, the next step was to build getSingleYearData(), starting with validating each argument before it is ever used to build a request.
+That previous return needed its own function from `JSON()`, which parses the API response into a plain R matrix (not even a dataframe). We used the `response_to_tibble()` to convert a matrix in an easy readable tibble, which shows the first row to actual column names and drops it, returning what as users consider tabular data. Since the request is working, the next step was to build `getSingleYearData()`, starting with validating each argument before it is ever used to build a request.
 
 ```{r response-to-tibble}
 response_to_tibble <- function(response) {
@@ -197,7 +195,7 @@ if (length(year) != 1 || !year %in% 2021:2024) {
 }
 ```
 
-The numeric variables needed two layers of validation. First, the requested names have to come from the allow list, and PWGTP is forced to be included even if the user does not ask for it, since none of the summary or plotting functions would work properly without it. Also, it requires at least one other numeric variable, because a request that only returned weights would not be useful on its own.
+The numeric variables needed two layers of validation. First, the requested names have to come from the allow list, and `PWGTP` is forced to be included even if the user does not ask for it, since none of the summary or plotting functions would work properly without it. Also, it requires at least one other numeric variable, because a request that only returned weights would not be useful on its own.
 
 ```{r check-numeric-vars}
 numeric_vars <- c("AGEP", "PWGTP")  # default
@@ -265,7 +263,7 @@ convertNumericVar <- function(values, var_name, var_values) {
 }
 ```
 
-We also needed to check for categorical variables go through the same two part validation, given that we needed to restrict to an allowed list, with at least one required SEX is just a sensible default. Unlike PWFTP, there is no categorical variable that gets force-included.
+We also needed to check for categorical variables go through the same two part validation, given that we needed to restrict to an allowed list, with at least one required `SEX` is just a sensible default. Unlike `PWFTP`, there is no categorical variable that gets force-included.
 
 ```{r check-categorical-vars}
 # specify categorical variables to return
@@ -284,7 +282,7 @@ if (length(categorical_vars) < 1) {
 }
 ```
 
-Turning a raw categorical column into something useful is useful for this project so we can convert into a factor with real labels rather than leaving it as bare integer codes. convertCategoricalVar() uses the dictionary we built in the "Parsing Variable Values" section.
+Turning a raw categorical column into something useful is useful for this project so we can convert into a factor with real labels rather than leaving it as bare integer codes. The `convertCategoricalVar()` uses the dictionary we built in the "Parsing Variable Values" section.
 
 ```{r convert-categorical-var}
 # Turns a raw categorical column into a factor, using the code -> label
@@ -336,7 +334,7 @@ if (!identical(geo_values, "all")) {
 }
 ```
 
-After every piece validated individually above, we created `getSingleYearData()` which assembles all of it into one big function. Build the request URL from the validated inputs, send it parse the response into a tibble, convert each column to its proper type, and tag the result with a "census" class so the custom summary()/plot() methods we built in Part 2 know how to handle it.
+After every piece validated individually above, we created `getSingleYearData()` which assembles all of it into one big function. Build the request URL from the validated inputs, send it parse the response into a tibble, convert each column to its proper type, and tag the result with a "census" class so the custom `summary()/plot()` methods we built in Part 2 know how to handle it.
 
 ```{r get-single-year-data}
 getSingleYearData <- function(year = 2024,
@@ -439,7 +437,7 @@ class(test_data)
 test_data
 ```
 
-Wrapping each bad-input case in tryCatch() lets the document show the exact error message produced without the whole render stopping partway through such as an invalid year, an invalid geography level, and a geography value that does not exist in that year's dictionary all get caught here.
+Wrapping each bad-input case in `tryCatch()` lets the document show the exact error message produced without the whole render stopping partway through such as an invalid year, an invalid geography level, and a geography value that does not exist in that year's dictionary all get caught here.
 
 ```{r test-error-handling}
 # invalid year
@@ -463,9 +461,9 @@ tryCatch(
 
 ### Combining Years
 
-Our function getSingleYearData() is only able to return one year at the time, which is not useful when we want to investigate changes overtime. Instead of duplicating any of the request/parsing/conversion logic, we built combineYearData() which calls getSingleData() one per request year and stacks the results together.
+Our function `getSingleYearData()` is only able to return one year at the time, which is not useful when we want to investigate changes overtime. Instead of duplicating any of the request/parsing/conversion logic, we built `combineYearData()` which calls `getSingleData()` one per request year and stacks the results together.
 
-This function has a couple of details worth to highlight. Each individual year's tibble returns already tagged with the "census" class, but we strip that off before combining them. The bind_rows() does not need to know about a custom class, and re-tagging happens once, on the final combined result, rather than on each piece. We also attach a year column to each year's data before stacking since once everything is combined there's no way to know which rows came from which year. Finally, I convert year into a factor with its levels explicitly sorted, so that later when this combined data gets passed to plot() or summary(), years come out in chronological order rather than however bind_rows() stacked them.
+This function has a couple of details worth to highlight. Each individual year's tibble returns already tagged with the "census" class, but we strip that off before combining them. The `bind_rows()` does not need to know about a custom class, and re-tagging happens once, on the final combined result, rather than on each piece. We also attach a year column to each year's data before stacking since once everything is combined there's no way to know which rows came from which year. Finally, I convert year into a factor with its levels explicitly sorted, so that later when this combined data gets passed to `plot()` or `summary()`, years come out in chronological order rather than however `bind_rows()` stacked them.
 
 ```{r combine-years-data}
 combineYearsData <- function(years,
@@ -515,7 +513,7 @@ class(combined_test)
 combined_test
 ```
 
-In addition to the two tryCatch() cases below, we wanted to check the quieter behavior of the function. Passing the same year multiple times shouldn't throw an error at all, but should just silently collapse to one year's worth of data. This final check here confirms that by comparing row counts instead of expecting an error message.
+In addition to the two `tryCatch()` cases below, we wanted to check the quieter behavior of the function. Passing the same year multiple times shouldn't throw an error at all, but should just silently collapse to one year's worth of data. This final check here confirms that by comparing row counts instead of expecting an error message.
 
 ```{r test-combine-error-handling}
 # invalid year in the vector
@@ -547,11 +545,11 @@ plot.function                        # method used when class = "function"
 getS3method("plot", "data.frame")    # method used when class = "data.frame"
 ```
 
-The generic function plot() calls UseMethod("plot") and then R chooses plot.function or plot.data.frame depending on the class of the argument. Since the tibbles returned by getSingleYearData() and combineYearData() are tagged to the "census" class, these defined the function named summary.census and plot.census, then if we use summary(my_data) and plot(my_data) to use them instead of just their default versions.
+The generic function `plot()` calls `UseMethod("plot")` and then R chooses plot.function or plot.data.frame depending on the class of the argument. Since the tibbles returned by `getSingleYearData()` and `combineYearData()` are tagged to the "census" class, these defined the function named `summary.census` and `plot.census`, then if we use `summary(my_data)` and `plot(my_data)` to use them instead of just their default versions.
 
 ### Numeric Summaries
 
-The rows in this data do not each represent one person. The variable PWGT explains how many people a given row actually stands for it, meaning it is a plain mean or count across rows would misrepresent the real population. The summary.census function is built so every statistic it produces is weighted by PWGTP instead of computed on raw values.
+The rows in this data do not each represent one person. The variable `PWGT` explains how many people a given row actually stands for it, meaning it is a plain mean or count across rows would misrepresent the real population. The summary.census function is built so every statistic it produces is weighted by `PWGTP` instead of computed on raw values.
 
 ```{r summary-census}
 summary.census <- function(object, numeric_vars = NULL, categorical_vars = NULL, ...) {
@@ -599,7 +597,7 @@ summary.census <- function(object, numeric_vars = NULL, categorical_vars = NULL,
 
 ### Graphical Summaries
 
-This same idea of weighting carries over to plotting by the plot.census function which requires the user to specify one categorical and one numeric variable. Then, it produces a boxplot of the numeric variable across the levels of the categorical one. We set weight = PWGTP inside in the aes() so the boxplot reflects the real weighted population distribution rather than the sampled rows.
+This same idea of weighting carries over to plotting by the plot.census function which requires the user to specify one categorical and one numeric variable. Then, it produces a boxplot of the numeric variable across the levels of the categorical one. We set `weight = PWGTP` inside in the `aes()` so the boxplot reflects the real weighted population distribution rather than the sampled rows.
 
 ```{r plot-census}
 plot.census <- function(x, cat_var, num_var, ...) {
@@ -633,16 +631,36 @@ my_census_data <- getSingleYearData(
 )
 ```
 
+Calling `summary()` twice here demonstrates both branches of the function: once with no arguments, so it auto-detects every numeric and categorical column in the data, and once with to just `AGEP` and `SEX`, so only those two show up in the output.
+
 ```{r summarize-example-data}
 summary(my_census_data)
 summary(my_census_data, numeric_vars = "AGEP", categorical_vars = "SEX")
 ```
+
+The boxplot here shows the weighted age distribution split by sex for North Carolina
 
 ```{r plot-example-data}
 plot(my_census_data, cat_var = "SEX", num_var = "AGEP")
 ```
 
 ## Investigation: Household Language Across Geography
+
+`HHL` records the primary language spoken at home. Based to the official [U.S. Census Bureau PUMS Data Dictionary](https://www2.census.gov/programs-surveys/acs/tech_docs/pums/data_dict/PUMS_Data_Dictionary_2020-2024.pdf), this categorical variable classifies households into five primary language groups:
+
+- `b` : N/A (Group Quarters / vacant
+
+- `1` : English only
+
+- `2` : Spanish
+
+- `3` : Other Indo-European languages
+
+- `4` : Asian and Pacific Island languages
+
+- `5` : Other language
+
+We are given `PWGT` which tell us how many people it stands for since a household is not evenly represent by a single row. We will use `summary.census()`'s weighted counts instead of a plain row count to see how common non-English-primary households and also whether that differs by region.
 
 ```{r investigation-setup}
 # one representative state per region, standing in for that whole region
@@ -670,6 +688,8 @@ region_summaries <- lapply(region_data, summary, categorical_vars = "HHL")
 region_summaries
 ```
 
+The raw weighted counts are not useful to compare across regions, for example since New York, Illinoins, North Carolina, and California do not have the same population. Since a region with more people will have larger counts in every HHL category regardless of its actual language mix, we solved that problem by converting each region's count to proportions of its own total.
+
 ```{r hhl-proportions}
 # convert each region's weighted counts to proportions so regions with
 # different total populations are directly comparable. tapply() (used
@@ -684,6 +704,8 @@ hhl_proportions <- lapply(region_summaries, function(s) {
 hhl_proportions
 ```
 
+Since household language on its own is divided into five separate proportions per region, we decided to create a variable "non-English-primary household" share per region so it gives a cleaner number to compare across regions.
+
 ```{r non-english-share}
 # 1: English
 english_only_label <- loadVariableValues(2024)$HHL[["1"]]
@@ -693,11 +715,17 @@ non_english_share <- sapply(hhl_proportions, function(p) 1 - p[[english_only_lab
 non_english_share
 ```
 
+The West has the highest non-English-primary household share by far (57.9%), about three times that of the South’s (20.7%) and higher than that of the Northeast (42.0%) and Midwest (32.2%). Further down, the West’s share is driven primarily by Spanish-speaking households (35.1% of all households in that region) and Asian and Pacific Island language households (12.4%) both well above any other region, reflecting California’s large share of the West’s sampled population here. Conversely, the South is almost 80% English-only, the most linguistically homogeneous of the four regions in this sample.
+
 ```{r plot-south-hhl}
 # plot() called with different inputs too: age spread by language group
 # within a single region (South) 
 plot(region_data$South, cat_var = "HHL", num_var = "AGEP")
 ```
+
+Age distribution by household language in the South group quarters/vacant households skew notably younger than other categories.
+
+To compare region against region directly rather than one region's internal breakdown, the four separate `region_data` tibbles need to become one combined tibble with a `REGION` column which is the same class-strip-then-retag pattern used in `combineYearsData()`, just applied across region instead of year, and reusing data already pulled rather than making a fifth API call.
 
 ```{r combine-all-regions}
 all_regions <- bind_rows(lapply(region_names, function(nm) {
@@ -715,3 +743,7 @@ class(all_regions) <- c("census", class(all_regions))
 plot(all_regions, cat_var = "REGION", num_var = "AGEP")
 summary(all_regions, categorical_vars = "HHL")
 ```
+
+Language spoken in households varies greatly on average by region (but not by age). The average age of the four regions ranges from 39.2 in the West to 40.7 in the Northeast, a difference of 1.5 years. That is a small difference, considering the standard deviation for each region is 23 years. The pooled mean for all four states is 39.77 years, right in the middle of that range.
+
+In the South, only English is spoken in 79.3% of households, but in the West, only English is spoken in 42.1% of households. The four states have an overall non-English primary share of 45.2%. This total is a population-weighted average, not a simple average of the four regional percentages (38.2%). The West’s combined total is higher, as it has a larger population and is also the most heavily non-English-speaking of the four states examined. These comparisons only work because the counts are weighted by the `PWGTP`. If they weren’t weighted, we would be counting the number of rows sampled in each state, not the number of people.

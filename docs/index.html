@@ -151,9 +151,6 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="variables" class="level2">
 <h2 class="anchored" data-anchor-id="variables">Variables</h2>
-</section>
-<section id="variables-used" class="level2">
-<h2 class="anchored" data-anchor-id="variables-used">Variables Used</h2>
 <p>This project works with a subset of the American Community Survey PUMS variables, listed below with a short description of what each one represents.</p>
 <p><strong>Numeric variables</strong></p>
 <table class="caption-top table">
@@ -353,7 +350,7 @@ $`2`
 <section id="parsing-api-data" class="level3">
 <h3 class="anchored" data-anchor-id="parsing-api-data">Parsing API Data</h3>
 <p>Firstly, we wanted to confirm we could get the data back from the Census API with a single hardcoded request given in our assignment. This meant working out the request format directly by adding the parameters in the URL along with the attached key, while expecting a successful response, before trying to generalize any of it into a function.</p>
-<p>We stored the API key as an environment variable. The test URL above filters to North Carolina (state:37) and adds SCHL = 24 (a doctorate student) in order to keep the return rows small and easy to verify without a specific format yet. We ran a sanity check with status_code() returning a 200 meaning that the request went through. We still do not know if the data is usable, but that is future problem.</p>
+<p>We stored the API key as an environment variable. The test URL above filters to North Carolina (state:37) and adds <code>SCHL</code> = 24 (a doctorate student) in order to keep the return rows small and easy to verify without a specific format yet. We ran a sanity check with status_code() returning a 200 meaning that the request went through. We still do not know if the data is usable, but that is future problem.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>census_key <span class="ot">&lt;-</span> <span class="fu">Sys.getenv</span>(<span class="st">"CENSUS_KEY"</span>)</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">nzchar</span>(census_key)) {</span>
@@ -375,7 +372,7 @@ $`2`
 <pre><code>[1] 200</code></pre>
 </div>
 </div>
-<p>That previous return needed its own function fromJSON(), which parses the API response into a plain R matrix (not even a dataframe). We used the response_to_tibble() to convert a matrix in an easy readable tibble, which shows the first row to actual column names and drops it, returning what as users consider tabular data. Since the request is working, the next step was to build getSingleYearData(), starting with validating each argument before it is ever used to build a request.</p>
+<p>That previous return needed its own function from <code>JSON()</code>, which parses the API response into a plain R matrix (not even a dataframe). We used the <code>response_to_tibble()</code> to convert a matrix in an easy readable tibble, which shows the first row to actual column names and drops it, returning what as users consider tabular data. Since the request is working, the next step was to build <code>getSingleYearData()</code>, starting with validating each argument before it is ever used to build a request.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>response_to_tibble <span class="ot">&lt;-</span> <span class="cf">function</span>(response) {</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="co"># stop if the API request was unsuccessful</span></span>
@@ -402,7 +399,7 @@ $`2`
 <span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stop</span>(<span class="st">"year must be a single value: 2021, 2022, 2023, or 2024"</span>)</span>
 <span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>The numeric variables needed two layers of validation. First, the requested names have to come from the allow list, and PWGTP is forced to be included even if the user does not ask for it, since none of the summary or plotting functions would work properly without it. Also, it requires at least one other numeric variable, because a request that only returned weights would not be useful on its own.</p>
+<p>The numeric variables needed two layers of validation. First, the requested names have to come from the allow list, and <code>PWGTP</code> is forced to be included even if the user does not ask for it, since none of the summary or plotting functions would work properly without it. Also, it requires at least one other numeric variable, because a request that only returned weights would not be useful on its own.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>numeric_vars <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"AGEP"</span>, <span class="st">"PWGTP"</span>)  <span class="co"># default</span></span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
@@ -469,7 +466,7 @@ $`2`
 <span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.numeric</span>(values)</span>
 <span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>We also needed to check for categorical variables go through the same two part validation, given that we needed to restrict to an allowed list, with at least one required SEX is just a sensible default. Unlike PWFTP, there is no categorical variable that gets force-included.</p>
+<p>We also needed to check for categorical variables go through the same two part validation, given that we needed to restrict to an allowed list, with at least one required <code>SEX</code> is just a sensible default. Unlike <code>PWFTP</code>, there is no categorical variable that gets force-included.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co"># specify categorical variables to return</span></span>
 <span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="co"># SEX is the default</span></span>
@@ -486,7 +483,7 @@ $`2`
 <span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stop</span>(<span class="st">"you must request at least one categorical variable"</span>)</span>
 <span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>Turning a raw categorical column into something useful is useful for this project so we can convert into a factor with real labels rather than leaving it as bare integer codes. convertCategoricalVar() uses the dictionary we built in the “Parsing Variable Values” section.</p>
+<p>Turning a raw categorical column into something useful is useful for this project so we can convert into a factor with real labels rather than leaving it as bare integer codes. The <code>convertCategoricalVar()</code> uses the dictionary we built in the “Parsing Variable Values” section.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Turns a raw categorical column into a factor, using the code -&gt; label</span></span>
 <span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="co"># lookup pulled from that year's variable dictionary (loadVariableValues())</span></span>
@@ -532,7 +529,7 @@ $`2`
 <span id="cb20-20"><a href="#cb20-20" aria-hidden="true" tabindex="-1"></a>  }</span>
 <span id="cb20-21"><a href="#cb20-21" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>After every piece validated individually above, we created <code>getSingleYearData()</code> which assembles all of it into one big function. Build the request URL from the validated inputs, send it parse the response into a tibble, convert each column to its proper type, and tag the result with a “census” class so the custom summary()/plot() methods we built in Part 2 know how to handle it.</p>
+<p>After every piece validated individually above, we created <code>getSingleYearData()</code> which assembles all of it into one big function. Build the request URL from the validated inputs, send it parse the response into a tibble, convert each column to its proper type, and tag the result with a “census” class so the custom <code>summary()/plot()</code> methods we built in Part 2 know how to handle it.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>getSingleYearData <span class="ot">&lt;-</span> <span class="cf">function</span>(<span class="at">year =</span> <span class="dv">2024</span>,</span>
 <span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>                               <span class="at">numeric_vars =</span> <span class="fu">c</span>(<span class="st">"AGEP"</span>),</span>
@@ -657,7 +654,7 @@ $`2`
 # ℹ 114,260 more rows</code></pre>
 </div>
 </div>
-<p>Wrapping each bad-input case in tryCatch() lets the document show the exact error message produced without the whole render stopping partway through such as an invalid year, an invalid geography level, and a geography value that does not exist in that year’s dictionary all get caught here.</p>
+<p>Wrapping each bad-input case in <code>tryCatch()</code> lets the document show the exact error message produced without the whole render stopping partway through such as an invalid year, an invalid geography level, and a geography value that does not exist in that year’s dictionary all get caught here.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="co"># invalid year</span></span>
 <span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="fu">tryCatch</span>(</span>
@@ -687,8 +684,8 @@ $`2`
 </section>
 <section id="combining-years" class="level3">
 <h3 class="anchored" data-anchor-id="combining-years">Combining Years</h3>
-<p>Our function getSingleYearData() is only able to return one year at the time, which is not useful when we want to investigate changes overtime. Instead of duplicating any of the request/parsing/conversion logic, we built combineYearData() which calls getSingleData() one per request year and stacks the results together.</p>
-<p>This function has a couple of details worth to highlight. Each individual year’s tibble returns already tagged with the “census” class, but we strip that off before combining them. The bind_rows() does not need to know about a custom class, and re-tagging happens once, on the final combined result, rather than on each piece. We also attach a year column to each year’s data before stacking since once everything is combined there’s no way to know which rows came from which year. Finally, I convert year into a factor with its levels explicitly sorted, so that later when this combined data gets passed to plot() or summary(), years come out in chronological order rather than however bind_rows() stacked them.</p>
+<p>Our function <code>getSingleYearData()</code> is only able to return one year at the time, which is not useful when we want to investigate changes overtime. Instead of duplicating any of the request/parsing/conversion logic, we built <code>combineYearData()</code> which calls <code>getSingleData()</code> one per request year and stacks the results together.</p>
+<p>This function has a couple of details worth to highlight. Each individual year’s tibble returns already tagged with the “census” class, but we strip that off before combining them. The <code>bind_rows()</code> does not need to know about a custom class, and re-tagging happens once, on the final combined result, rather than on each piece. We also attach a year column to each year’s data before stacking since once everything is combined there’s no way to know which rows came from which year. Finally, I convert year into a factor with its levels explicitly sorted, so that later when this combined data gets passed to <code>plot()</code> or <code>summary()</code>, years come out in chronological order rather than however <code>bind_rows()</code> stacked them.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>combineYearsData <span class="ot">&lt;-</span> <span class="cf">function</span>(years,</span>
 <span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>                              <span class="at">numeric_vars =</span> <span class="fu">c</span>(<span class="st">"AGEP"</span>),</span>
@@ -761,7 +758,7 @@ New names:
 # ℹ 226,180 more rows</code></pre>
 </div>
 </div>
-<p>In addition to the two tryCatch() cases below, we wanted to check the quieter behavior of the function. Passing the same year multiple times shouldn’t throw an error at all, but should just silently collapse to one year’s worth of data. This final check here confirms that by comparing row counts instead of expecting an error message.</p>
+<p>In addition to the two <code>tryCatch()</code> cases below, we wanted to check the quieter behavior of the function. Passing the same year multiple times shouldn’t throw an error at all, but should just silently collapse to one year’s worth of data. This final check here confirms that by comparing row counts instead of expecting an error message.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb41"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="co"># invalid year in the vector</span></span>
 <span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a><span class="fu">tryCatch</span>(</span>
@@ -833,7 +830,7 @@ New names:
     curve(expr = x, from = from, to = to, xlim = xlim, ylab = ylab, 
         ...)
 }
-&lt;bytecode: 0x0000021241d3f0a8&gt;
+&lt;bytecode: 0x000001d5cb28b188&gt;
 &lt;environment: namespace:graphics&gt;</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb51"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a><span class="fu">getS3method</span>(<span class="st">"plot"</span>, <span class="st">"data.frame"</span>)    <span class="co"># method used when class = "data.frame"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -866,15 +863,15 @@ New names:
         pairs(data.matrix(x), ...)
     }
 }
-&lt;bytecode: 0x0000021241d58c78&gt;
+&lt;bytecode: 0x000001d5cb20ec48&gt;
 &lt;environment: namespace:graphics&gt;</code></pre>
 </div>
 </div>
-<p>The generic function plot() calls UseMethod(“plot”) and then R chooses plot.function or plot.data.frame depending on the class of the argument. Since the tibbles returned by getSingleYearData() and combineYearData() are tagged to the “census” class, these defined the function named summary.census and plot.census, then if we use summary(my_data) and plot(my_data) to use them instead of just their default versions.</p>
+<p>The generic function <code>plot()</code> calls <code>UseMethod("plot")</code> and then R chooses plot.function or plot.data.frame depending on the class of the argument. Since the tibbles returned by <code>getSingleYearData()</code> and <code>combineYearData()</code> are tagged to the “census” class, these defined the function named <code>summary.census</code> and <code>plot.census</code>, then if we use <code>summary(my_data)</code> and <code>plot(my_data)</code> to use them instead of just their default versions.</p>
 </section>
 <section id="numeric-summaries" class="level3">
 <h3 class="anchored" data-anchor-id="numeric-summaries">Numeric Summaries</h3>
-<p>The rows in this data do not each represent one person. The variable PWGT explains how many people a given row actually stands for it, meaning it is a plain mean or count across rows would misrepresent the real population. The summary.census function is built so every statistic it produces is weighted by PWGTP instead of computed on raw values.</p>
+<p>The rows in this data do not each represent one person. The variable <code>PWGT</code> explains how many people a given row actually stands for it, meaning it is a plain mean or count across rows would misrepresent the real population. The summary.census function is built so every statistic it produces is weighted by <code>PWGTP</code> instead of computed on raw values.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb53"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a>summary.census <span class="ot">&lt;-</span> <span class="cf">function</span>(object, <span class="at">numeric_vars =</span> <span class="cn">NULL</span>, <span class="at">categorical_vars =</span> <span class="cn">NULL</span>, ...) {</span>
 <span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a></span>
@@ -921,7 +918,7 @@ New names:
 </section>
 <section id="graphical-summaries" class="level3">
 <h3 class="anchored" data-anchor-id="graphical-summaries">Graphical Summaries</h3>
-<p>This same idea of weighting carries over to plotting by the plot.census function which requires the user to specify one categorical and one numeric variable. Then, it produces a boxplot of the numeric variable across the levels of the categorical one. We set weight = PWGTP inside in the aes() so the boxplot reflects the real weighted population distribution rather than the sampled rows.</p>
+<p>This same idea of weighting carries over to plotting by the plot.census function which requires the user to specify one categorical and one numeric variable. Then, it produces a boxplot of the numeric variable across the levels of the categorical one. We set <code>weight = PWGTP</code> inside in the <code>aes()</code> so the boxplot reflects the real weighted population distribution rather than the sampled rows.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb54"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a>plot.census <span class="ot">&lt;-</span> <span class="cf">function</span>(x, cat_var, num_var, ...) {</span>
 <span id="cb54-2"><a href="#cb54-2" aria-hidden="true" tabindex="-1"></a></span>
@@ -960,6 +957,7 @@ New names:
 • `` -&gt; `...6`</code></pre>
 </div>
 </div>
+<p>Calling <code>summary()</code> twice here demonstrates both branches of the function: once with no arguments, so it auto-detects every numeric and categorical column in the data, and once with to just <code>AGEP</code> and <code>SEX</code>, so only those two show up in the output.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb57"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(my_census_data)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
@@ -1056,6 +1054,7 @@ $categorical$SEX
 5391320 5654704 </code></pre>
 </div>
 </div>
+<p>The boxplot here shows the weighted age distribution split by sex for North Carolina</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb61"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb61-1"><a href="#cb61-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(my_census_data, <span class="at">cat_var =</span> <span class="st">"SEX"</span>, <span class="at">num_var =</span> <span class="st">"AGEP"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output-display">
@@ -1070,6 +1069,16 @@ $categorical$SEX
 </section>
 <section id="investigation-household-language-across-geography" class="level2">
 <h2 class="anchored" data-anchor-id="investigation-household-language-across-geography">Investigation: Household Language Across Geography</h2>
+<p><code>HHL</code> records the primary language spoken at home. Based to the official <a href="https://www2.census.gov/programs-surveys/acs/tech_docs/pums/data_dict/PUMS_Data_Dictionary_2020-2024.pdf">U.S. Census Bureau PUMS Data Dictionary</a>, this categorical variable classifies households into five primary language groups:</p>
+<ul>
+<li><p><code>b</code> : N/A (Group Quarters / vacant</p></li>
+<li><p><code>1</code> : English only</p></li>
+<li><p><code>2</code> : Spanish</p></li>
+<li><p><code>3</code> : Other Indo-European languages</p></li>
+<li><p><code>4</code> : Asian and Pacific Island languages</p></li>
+<li><p><code>5</code> : Other language</p></li>
+</ul>
+<p>We are given <code>PWGT</code> which tell us how many people it stands for since a household is not evenly represent by a single row. We will use <code>summary.census()</code>’s weighted counts instead of a plain row count to see how common non-English-primary households and also whether that differs by region.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb62"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a><span class="co"># one representative state per region, standing in for that whole region</span></span>
 <span id="cb62-2"><a href="#cb62-2" aria-hidden="true" tabindex="-1"></a><span class="co"># so each pull stays the size of a single-state call instead of an entire</span></span>
@@ -1191,6 +1200,7 @@ Asian and Pacific Island languages                     Other Language
                            4886345                             648047 </code></pre>
 </div>
 </div>
+<p>The raw weighted counts are not useful to compare across regions, for example since New York, Illinoins, North Carolina, and California do not have the same population. Since a region with more people will have larger counts in every HHL category regardless of its actual language mix, we solved that problem by converting each region’s count to proportions of its own total.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb67"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a><span class="co"># convert each region's weighted counts to proportions so regions with</span></span>
 <span id="cb67-2"><a href="#cb67-2" aria-hidden="true" tabindex="-1"></a><span class="co"># different total populations are directly comparable. tapply() (used</span></span>
@@ -1237,6 +1247,7 @@ Asian and Pacific Island languages                     Other Language
                              0.124                              0.016 </code></pre>
 </div>
 </div>
+<p>Since household language on its own is divided into five separate proportions per region, we decided to create a variable “non-English-primary household” share per region so it gives a cleaner number to compare across regions.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb69"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb69-1"><a href="#cb69-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 1: English</span></span>
 <span id="cb69-2"><a href="#cb69-2" aria-hidden="true" tabindex="-1"></a>english_only_label <span class="ot">&lt;-</span> <span class="fu">loadVariableValues</span>(<span class="dv">2024</span>)<span class="sc">$</span>HHL[[<span class="st">"1"</span>]]</span>
@@ -1251,6 +1262,7 @@ Asian and Pacific Island languages                     Other Language
     0.420     0.322     0.207     0.579 </code></pre>
 </div>
 </div>
+<p>The West has the highest non-English-primary household share by far (57.9%), about three times that of the South’s (20.7%) and higher than that of the Northeast (42.0%) and Midwest (32.2%). Further down, the West’s share is driven primarily by Spanish-speaking households (35.1% of all households in that region) and Asian and Pacific Island language households (12.4%) both well above any other region, reflecting California’s large share of the West’s sampled population here. Conversely, the South is almost 80% English-only, the most linguistically homogeneous of the four regions in this sample.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb73"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a><span class="co"># plot() called with different inputs too: age spread by language group</span></span>
 <span id="cb73-2"><a href="#cb73-2" aria-hidden="true" tabindex="-1"></a><span class="co"># within a single region (South) </span></span>
@@ -1263,6 +1275,8 @@ Asian and Pacific Island languages                     Other Language
 </div>
 </div>
 </div>
+<p>Age distribution by household language in the South group quarters/vacant households skew notably younger than other categories.</p>
+<p>To compare region against region directly rather than one region’s internal breakdown, the four separate <code>region_data</code> tibbles need to become one combined tibble with a <code>REGION</code> column which is the same class-strip-then-retag pattern used in <code>combineYearsData()</code>, just applied across region instead of year, and reusing data already pulled rather than making a fifth API call.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb74"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb74-1"><a href="#cb74-1" aria-hidden="true" tabindex="-1"></a>all_regions <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(<span class="fu">lapply</span>(region_names, <span class="cf">function</span>(nm) {</span>
 <span id="cb74-2"><a href="#cb74-2" aria-hidden="true" tabindex="-1"></a>  one_region <span class="ot">&lt;-</span> region_data[[nm]]</span>
@@ -1305,6 +1319,8 @@ Asian and Pacific Island languages                     Other Language
                            6931717                            1530932 </code></pre>
 </div>
 </div>
+<p>Language spoken in households varies greatly on average by region (but not by age). The average age of the four regions ranges from 39.2 in the West to 40.7 in the Northeast, a difference of 1.5 years. That is a small difference, considering the standard deviation for each region is 23 years. The pooled mean for all four states is 39.77 years, right in the middle of that range.</p>
+<p>In the South, only English is spoken in 79.3% of households, but in the West, only English is spoken in 42.1% of households. The four states have an overall non-English primary share of 45.2%. This total is a population-weighted average, not a simple average of the four regional percentages (38.2%). The West’s combined total is higher, as it has a larger population and is also the most heavily non-English-speaking of the four states examined. These comparisons only work because the counts are weighted by the <code>PWGTP</code>. If they weren’t weighted, we would be counting the number of rows sampled in each state, not the number of people.</p>
 
 
 </section>
