@@ -258,6 +258,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="part-1-data-processing">Part 1: Data Processing</h2>
 <section id="parsing-variable-values" class="level3">
 <h3 class="anchored" data-anchor-id="parsing-variable-values">Parsing Variable Values</h3>
+<p>Most of the categorical variables in this dataset do not come back from the API as significant values, so before we start working with this data we needed to find a way to translate those codes into actual labels. The Census API exposes a <code>variables.json</code> endpoint for each year that maps every variable’s code to human readable variables.</p>
+<p>Since the API was an inconsistent way to nest some variables such like code-to-label mapping is plain named list and others have an extra mapping inside an extra list layer named item. We built extractItemLabels objective is to normalize it and checks for one level of item nesting, then checks again for a second level, so every variable ends up with the same flat code-to-label structure by the time the rest of the code touches it.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Census variables.json nests value labels under a list named "item"</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co"># this helper unwraps that structure into a simple code aka label list.</span></span>
@@ -277,6 +279,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>  values</span>
 <span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<p><code>getVariableValues()</code> builds the dictionary for a given year. First, the API renamed the state geography variable since it is set to <code>ST</code> for 2021 and 2022 dictionaries, but <code>STATE</code> from 2023 on, we have the function to choose the right name based on year before it can even ask for the variable’s labels. Second, we only request the dictionary entries for the variables in the project uses (<code>vars_needed</code>), rather than extracting the entire dictionary. Also, we parsed the response with <code>simplyVector = FALSE</code>, since jsonlite’s default simplification collapses the required nested list structure that extractItemLabels() needs to revise. Otherwise, the item wrapper gets flattened away before we get an opportunity to detect it.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>getVariableValues <span class="ot">&lt;-</span> <span class="cf">function</span>(year) {</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span>year <span class="sc">%in%</span> <span class="dv">2021</span><span class="sc">:</span><span class="dv">2024</span>) {</span>
@@ -308,6 +311,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>  value_list</span>
 <span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<p>Since a given year’s variable dictionary does not change, there is no reason to send another request from the API every time this document gets knit. Then, this chunk builds a dictionary for all four years and saves it to disk as an <code>.rds</code> file, and it will only run at all if that file does not already exits.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Build the variable dictionary once per year and cache it to disk, so we</span></span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="co"># don't hit the Census API every time this document is knit</span></span>
@@ -321,6 +325,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">saveRDS</span>(variable_values, <span class="st">"data/variable_values.rds"</span>)</span>
 <span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<p>The function below is what we used for the entire of the project, it reads the cached dictionary back off disk and returns the portion for one specific year. In this way the <code>getSingleVariableYear</code> and the conversation functions never needs to know anything about how the dictionary was built or cached.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Loads the cached dictionary for one year a list of code = label</span></span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="co"># mappings, one per variable for use by getSingleYearData()</span></span>
@@ -329,6 +334,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  variable_values[[<span class="fu">as.character</span>(year)]]</span>
 <span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<p>Here is a quick sanity check so we can see how the whole pipeline actually produced something sensible before building anything on top of it.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># quick sanity check that the dictionary loaded and looks right</span></span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">loadVariableValues</span>(<span class="dv">2021</span>)<span class="sc">$</span>SCH</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -350,7 +356,7 @@ $`2`
 <section id="parsing-api-data" class="level3">
 <h3 class="anchored" data-anchor-id="parsing-api-data">Parsing API Data</h3>
 <p>Firstly, we wanted to confirm we could get the data back from the Census API with a single hardcoded request given in our assignment. This meant working out the request format directly by adding the parameters in the URL along with the attached key, while expecting a successful response, before trying to generalize any of it into a function.</p>
-<p>We stored the API key as an environment variable. The test URL above filters to North Carolina (state:37) and adds <code>SCHL</code> = 24 (a doctorate student) in order to keep the return rows small and easy to verify without a specific format yet. We ran a sanity check with status_code() returning a 200 meaning that the request went through. We still do not know if the data is usable, but that is future problem.</p>
+<p>We stored the API key as an environment variable. The test URL above filters to North Carolina (<code>State = 37</code>) and adds <code>SCHL = 24</code> (a doctorate student) in order to keep the return rows small and easy to verify without a specific format yet. We ran a sanity check with <code>status_code()</code> returning a 200 meaning that the request went through. We still do not know if the data is usable, but that is future problem.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>census_key <span class="ot">&lt;-</span> <span class="fu">Sys.getenv</span>(<span class="st">"CENSUS_KEY"</span>)</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">nzchar</span>(census_key)) {</span>
@@ -505,7 +511,7 @@ $`2`
 <span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stop</span>(<span class="st">"geo_level must be exactly one of: "</span>, <span class="fu">paste</span>(allowed_geo_levels, <span class="at">collapse =</span> <span class="st">", "</span>))</span>
 <span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>Here is when I wanted to throw my laptop from the window. There is this ST/STATE name inconsistency, this time for validating the actual geography codes rather than just building the URL. The dictionary key for state-level data is ST in 2021 and 2022 and STATE from 2023 onward. Unlike geo_level and geo_values, we can allow all as a special case, which ignores the dictionary validation completely rather than trying to match it against all the codes.</p>
+<p>Here is when I wanted to throw my laptop from the window. There is this <code>ST/STATE</code> name inconsistency, this time for validating the actual geography codes rather than just building the URL. The dictionary key for state-level data is ST in 2021 and 2022 and STATE from 2023 onward. Unlike geo_level and geo_values, we can allow all as a special case, which ignores the dictionary validation completely rather than trying to match it against all the codes.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co"># default geography value. example default is a single State</span></span>
 <span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>geo_values <span class="ot">&lt;-</span> <span class="st">"37"</span>  <span class="co"># North Carolina</span></span>
@@ -830,7 +836,7 @@ New names:
     curve(expr = x, from = from, to = to, xlim = xlim, ylab = ylab, 
         ...)
 }
-&lt;bytecode: 0x000001d5cb28b188&gt;
+&lt;bytecode: 0x000002a261246310&gt;
 &lt;environment: namespace:graphics&gt;</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb51"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a><span class="fu">getS3method</span>(<span class="st">"plot"</span>, <span class="st">"data.frame"</span>)    <span class="co"># method used when class = "data.frame"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -863,7 +869,7 @@ New names:
         pairs(data.matrix(x), ...)
     }
 }
-&lt;bytecode: 0x000001d5cb20ec48&gt;
+&lt;bytecode: 0x000002a26118ee78&gt;
 &lt;environment: namespace:graphics&gt;</code></pre>
 </div>
 </div>
@@ -1200,7 +1206,7 @@ Asian and Pacific Island languages                     Other Language
                            4886345                             648047 </code></pre>
 </div>
 </div>
-<p>The raw weighted counts are not useful to compare across regions, for example since New York, Illinoins, North Carolina, and California do not have the same population. Since a region with more people will have larger counts in every HHL category regardless of its actual language mix, we solved that problem by converting each region’s count to proportions of its own total.</p>
+<p>The raw weighted counts are not useful to compare across regions, for example since New York, Illinoins, North Carolina, and California do not have the same population. Since a region with more people will have larger counts in every <code>HHL</code> category regardless of its actual language mix, we solved that problem by converting each region’s count to proportions of its own total.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb67"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a><span class="co"># convert each region's weighted counts to proportions so regions with</span></span>
 <span id="cb67-2"><a href="#cb67-2" aria-hidden="true" tabindex="-1"></a><span class="co"># different total populations are directly comparable. tapply() (used</span></span>

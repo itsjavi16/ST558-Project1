@@ -59,6 +59,10 @@ This project works with a subset of the American Community Survey PUMS variables
 
 ### Parsing Variable Values
 
+Most of the categorical variables in this dataset do not come back from the API as significant values, so before we start working with this data we needed to find a way to translate those codes into actual labels. The Census API exposes a `variables.json` endpoint for each year that maps every variable's code to human readable variables.
+
+Since the API was an inconsistent way to nest some variables such like code-to-label mapping is plain named list and others have an extra mapping inside an extra list layer named item. We built extractItemLabels objective is to normalize it and checks for one level of item nesting, then checks again for a second level, so every variable ends up with the same flat code-to-label structure by the time the rest of the code touches it.
+
 ```{r extract-item-labels}
 # Census variables.json nests value labels under a list named "item"
 # this helper unwraps that structure into a simple code aka label list.
@@ -78,6 +82,8 @@ extractItemLabels <- function(values) {
   values
 }
 ```
+
+`getVariableValues()` builds the dictionary for a given year. First, the API renamed the state geography variable since it is set to `ST` for 2021 and 2022 dictionaries, but `STATE` from 2023 on, we have the function to choose the right name based on year before it can even ask for the variable's labels. Second, we only request the dictionary entries for the variables in the project uses (`vars_needed`), rather than extracting the entire dictionary. Also, we parsed the response with `simplyVector = FALSE`, since jsonlite's default simplification collapses the required nested list structure that extractItemLabels() needs to revise. Otherwise, the item wrapper gets flattened away before we get an opportunity to detect it.
 
 ```{r get-variable-values}
 getVariableValues <- function(year) {
@@ -111,6 +117,8 @@ getVariableValues <- function(year) {
 }
 ```
 
+Since a given year's variable dictionary does not change, there is no reason to send another request from the API every time this document gets knit. Then, this chunk builds a dictionary for all four years and saves it to disk as an `.rds` file, and it will only run at all if that file does not already exits.
+
 ```{r cache-variable-values}
 # Build the variable dictionary once per year and cache it to disk, so we
 # don't hit the Census API every time this document is knit
@@ -125,6 +133,8 @@ if (!file.exists("data/variable_values.rds")) {
 }
 ```
 
+The function below is what we used for the entire of the project, it reads the cached dictionary back off disk and returns the portion for one specific year. In this way the `getSingleVariableYear` and the conversation functions never needs to know anything about how the dictionary was built or cached.
+
 ```{r load-variable-values}
 # Loads the cached dictionary for one year a list of code = label
 # mappings, one per variable for use by getSingleYearData()
@@ -133,6 +143,8 @@ loadVariableValues <- function(year) {
   variable_values[[as.character(year)]]
 }
 ```
+
+Here is a quick sanity check so we can see how the whole pipeline actually produced something sensible before building anything on top of it.
 
 ```{r sanity-check-SCH}
 # quick sanity check that the dictionary loaded and looks right
@@ -143,7 +155,7 @@ loadVariableValues(2021)$SCH
 
 Firstly, we wanted to confirm we could get the data back from the Census API with a single hardcoded request given in our assignment. This meant working out the request format directly by adding the parameters in the URL along with the attached key, while expecting a successful response, before trying to generalize any of it into a function.
 
-We stored the API key as an environment variable. The test URL above filters to North Carolina (state:37) and adds `SCHL` = 24 (a doctorate student) in order to keep the return rows small and easy to verify without a specific format yet. We ran a sanity check with status_code() returning a 200 meaning that the request went through. We still do not know if the data is usable, but that is future problem.
+We stored the API key as an environment variable. The test URL above filters to North Carolina (`State = 37`) and adds `SCHL = 24` (a doctorate student) in order to keep the return rows small and easy to verify without a specific format yet. We ran a sanity check with `status_code()` returning a 200 meaning that the request went through. We still do not know if the data is usable, but that is future problem.
 
 ```{r test-basic-request}
 census_key <- Sys.getenv("CENSUS_KEY")
@@ -308,7 +320,7 @@ if (length(geo_level) != 1 || !geo_level %in% allowed_geo_levels) {
 }
 ```
 
-Here is when I wanted to throw my laptop from the window. There is this ST/STATE name inconsistency, this time for validating the actual geography codes rather than just building the URL. The dictionary key for state-level data is ST in 2021 and 2022 and STATE from 2023 onward. Unlike geo_level and geo_values, we can allow all as a special case, which ignores the dictionary validation completely rather than trying to match it against all the codes.
+Here is when I wanted to throw my laptop from the window. There is this `ST/STATE` name inconsistency, this time for validating the actual geography codes rather than just building the URL. The dictionary key for state-level data is ST in 2021 and 2022 and STATE from 2023 onward. Unlike geo_level and geo_values, we can allow all as a special case, which ignores the dictionary validation completely rather than trying to match it against all the codes.
 
 ```{r check-geo-value}
 # default geography value. example default is a single State
@@ -688,7 +700,7 @@ region_summaries <- lapply(region_data, summary, categorical_vars = "HHL")
 region_summaries
 ```
 
-The raw weighted counts are not useful to compare across regions, for example since New York, Illinoins, North Carolina, and California do not have the same population. Since a region with more people will have larger counts in every HHL category regardless of its actual language mix, we solved that problem by converting each region's count to proportions of its own total.
+The raw weighted counts are not useful to compare across regions, for example since New York, Illinoins, North Carolina, and California do not have the same population. Since a region with more people will have larger counts in every `HHL` category regardless of its actual language mix, we solved that problem by converting each region's count to proportions of its own total.
 
 ```{r hhl-proportions}
 # convert each region's weighted counts to proportions so regions with
