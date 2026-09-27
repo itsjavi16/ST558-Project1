@@ -259,7 +259,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="parsing-variable-values" class="level3">
 <h3 class="anchored" data-anchor-id="parsing-variable-values">Parsing Variable Values</h3>
 <p>Most of the categorical variables in this dataset do not come back from the API as significant values, so before we start working with this data we needed to find a way to translate those codes into actual labels. The Census API exposes a <code>variables.json</code> endpoint for each year that maps every variable’s code to human readable variables.</p>
-<p>Since the API was an inconsistent way to nest some variables such like code-to-label mapping is plain named list and others have an extra mapping inside an extra list layer named item. We built extractItemLabels objective is to normalize it and checks for one level of item nesting, then checks again for a second level, so every variable ends up with the same flat code-to-label structure by the time the rest of the code touches it.</p>
+<p>Since the API was an inconsistent way to nest some variables such like code-to-label mapping is plain named list and others have an extra mapping inside an extra list layer named item. We built extractItemLabels objective is to normalize it and checks for one level of item nesting then checks again for a second level so every variable ends up with the same flat code-to-label structure by the time the rest of the code touches it.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Census variables.json nests value labels under a list named "item"</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co"># this helper unwraps that structure into a simple code aka label list.</span></span>
@@ -279,7 +279,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>  values</span>
 <span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p><code>getVariableValues()</code> builds the dictionary for a given year. First, the API renamed the state geography variable since it is set to <code>ST</code> for 2021 and 2022 dictionaries, but <code>STATE</code> from 2023 on, we have the function to choose the right name based on year before it can even ask for the variable’s labels. Second, we only request the dictionary entries for the variables in the project uses (<code>vars_needed</code>), rather than extracting the entire dictionary. Also, we parsed the response with <code>simplyVector = FALSE</code>, since jsonlite’s default simplification collapses the required nested list structure that extractItemLabels() needs to revise. Otherwise, the item wrapper gets flattened away before we get an opportunity to detect it.</p>
+<p><code>getVariableValues()</code> builds the dictionary for a given year. First, the API renamed the state geography variable since it is set to <code>ST</code> for 2021 and 2022 dictionaries, but <code>STATE</code> from 2023 on we have the function to choose the right name based on year before it can even ask for the variable’s labels. Second, we only request the dictionary entries for the variables in the project uses (<code>vars_needed</code>) rather than extracting the entire dictionary. Also, we parsed the response with <code>simplyVector = FALSE</code>, since jsonlite’s default simplification collapses the required nested list structure that extractItemLabels() needs to revise. Otherwise, the item wrapper gets flattened away before we get an opportunity to detect it.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>getVariableValues <span class="ot">&lt;-</span> <span class="cf">function</span>(year) {</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span>year <span class="sc">%in%</span> <span class="dv">2021</span><span class="sc">:</span><span class="dv">2024</span>) {</span>
@@ -311,7 +311,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>  value_list</span>
 <span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>Since a given year’s variable dictionary does not change, there is no reason to send another request from the API every time this document gets knit. Then, this chunk builds a dictionary for all four years and saves it to disk as an <code>.rds</code> file, and it will only run at all if that file does not already exits.</p>
+<p>Since a given year’s variable dictionary does not change there is no reason to send another request from the API every time this document gets knit. Then, this chunk builds a dictionary for all four years and saves it to disk as an <code>.rds</code> file, and it will only run at all if that file does not already exits.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Build the variable dictionary once per year and cache it to disk, so we</span></span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="co"># don't hit the Census API every time this document is knit</span></span>
@@ -325,7 +325,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">saveRDS</span>(variable_values, <span class="st">"data/variable_values.rds"</span>)</span>
 <span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>The function below is what we used for the entire of the project, it reads the cached dictionary back off disk and returns the portion for one specific year. In this way the <code>getSingleVariableYear</code> and the conversation functions never needs to know anything about how the dictionary was built or cached.</p>
+<p>The function below is what we used for the entire of the project it reads the cached dictionary back off disk and returns the portion for one specific year. In this way the <code>getSingleVariableYear</code> and the conversation functions never needs to know anything about how the dictionary was built or cached.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Loads the cached dictionary for one year a list of code = label</span></span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="co"># mappings, one per variable for use by getSingleYearData()</span></span>
@@ -378,7 +378,7 @@ $`2`
 <pre><code>[1] 200</code></pre>
 </div>
 </div>
-<p>That previous return needed its own function from <code>JSON()</code>, which parses the API response into a plain R matrix (not even a dataframe). We used the <code>response_to_tibble()</code> to convert a matrix in an easy readable tibble, which shows the first row to actual column names and drops it, returning what as users consider tabular data. Since the request is working, the next step was to build <code>getSingleYearData()</code>, starting with validating each argument before it is ever used to build a request.</p>
+<p>That previous return needed its own function from <code>JSON()</code>, which parses the API response into a plain R matrix (not even a dataframe). We used the <code>response_to_tibble()</code> to convert a matrix in an eligible tibble revealing the first row to actual column names and drops it returning what as users consider tabular data. Since the request is working the next step was to build <code>getSingleYearData()</code>, starting with validating each argument before it is ever used to build a request.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>response_to_tibble <span class="ot">&lt;-</span> <span class="cf">function</span>(response) {</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="co"># stop if the API request was unsuccessful</span></span>
@@ -427,7 +427,7 @@ $`2`
 <span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stop</span>(<span class="st">"you must request at least one numeric variable besides PWGTP"</span>)</span>
 <span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>There are two numeric variables, <code>JWAP</code> and <code>JWDP</code> that do not come back directly as numbers, instead they returned as coded time-range variables like “12:00pm to 12:05pm”. In order to convert this into a simple single numeric value, we took the midpoint of each range and returned it as a time-of-day value using the <code>library(hms)</code>. For those labels that show that the person does not have an applicable arrival/departure time come back as NA instead of a formatted time.</p>
+<p>There are two numeric variables, <code>JWAP</code> and <code>JWDP</code> that do not come back directly as numbers, instead they returned as coded time-range variables like “12:00pm to 12:05pm”. In order to convert this into a simple single numeric value we took the midpoint of each range and returned it as a time-of-day value using the <code>library(hms)</code>. For those labels that show that the person does not have an applicable arrival/departure time come back as NA instead of a formatted time.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># JWAP/JWDP come back as coded time-range labels ("12:00 p.m. to 12:04 p.m.") instead of plain numbers </span></span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="co"># this function finds  the midpoint of that range as a time value</span></span>
@@ -453,7 +453,7 @@ $`2`
 <pre><code>[1] NA</code></pre>
 </div>
 </div>
-<p>The function covertNumericVar() decides per each column, whether a variable needs a time-midpoint calculation or just needs to be forced to a plain number. For example, with the API’s “N” not-applicable code converted to a NA first.</p>
+<p>The function <code>covertNumericVar()</code> decides per each column whether a variable needs a time-midpoint calculation or just needs to be forced to a plain number. For example, with the API’s “N” not-applicable code converted to a NA first.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># applies the right conversion to one requested numeric column: JWAP/JWDP</span></span>
 <span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="co"># get the time-midpoint treatment above </span></span>
@@ -472,7 +472,7 @@ $`2`
 <span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.numeric</span>(values)</span>
 <span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>We also needed to check for categorical variables go through the same two part validation, given that we needed to restrict to an allowed list, with at least one required <code>SEX</code> is just a sensible default. Unlike <code>PWFTP</code>, there is no categorical variable that gets force-included.</p>
+<p>We also needed to check for categorical variables go through the same two part validation, given that we needed to restrict to an allowed list with at least one required <code>SEX</code> is just a sensible default. Unlike <code>PWFTP</code>, there is no categorical variable that gets force-included.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co"># specify categorical variables to return</span></span>
 <span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="co"># SEX is the default</span></span>
@@ -511,7 +511,7 @@ $`2`
 <span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stop</span>(<span class="st">"geo_level must be exactly one of: "</span>, <span class="fu">paste</span>(allowed_geo_levels, <span class="at">collapse =</span> <span class="st">", "</span>))</span>
 <span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>Here is when I wanted to throw my laptop from the window. There is this <code>ST/STATE</code> name inconsistency, this time for validating the actual geography codes rather than just building the URL. The dictionary key for state-level data is ST in 2021 and 2022 and STATE from 2023 onward. Unlike geo_level and geo_values, we can allow all as a special case, which ignores the dictionary validation completely rather than trying to match it against all the codes.</p>
+<p>Here is when I wanted to throw my laptop from the window. There is this <code>ST/STATE</code> name inconsistency, this time for validating the actual geography codes rather than just building the URL. The dictionary key for state-level data is <code>ST</code> in 2021 and 2022 and <code>STATE</code> from 2023 onward. Unlike <code>geo_level</code> and geo_values, we can allow all as a special case, which ignores the dictionary validation completely rather than trying to match it against all the codes.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co"># default geography value. example default is a single State</span></span>
 <span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>geo_values <span class="ot">&lt;-</span> <span class="st">"37"</span>  <span class="co"># North Carolina</span></span>
@@ -535,7 +535,7 @@ $`2`
 <span id="cb20-20"><a href="#cb20-20" aria-hidden="true" tabindex="-1"></a>  }</span>
 <span id="cb20-21"><a href="#cb20-21" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>After every piece validated individually above, we created <code>getSingleYearData()</code> which assembles all of it into one big function. Build the request URL from the validated inputs, send it parse the response into a tibble, convert each column to its proper type, and tag the result with a “census” class so the custom <code>summary()/plot()</code> methods we built in Part 2 know how to handle it.</p>
+<p>After every piece validated individually above, we created <code>getSingleYearData(</code>) which assembles all of it into one big function. Build the request URL from the validated inputs, send it parse the response into a tibble, convert each column to its proper type, and tag the result with a “census” class so the custom <code>summary()/plot()</code> methods we built in Part 2 know how to handle it.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>getSingleYearData <span class="ot">&lt;-</span> <span class="cf">function</span>(<span class="at">year =</span> <span class="dv">2024</span>,</span>
 <span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>                               <span class="at">numeric_vars =</span> <span class="fu">c</span>(<span class="st">"AGEP"</span>),</span>
@@ -690,8 +690,8 @@ $`2`
 </section>
 <section id="combining-years" class="level3">
 <h3 class="anchored" data-anchor-id="combining-years">Combining Years</h3>
-<p>Our function <code>getSingleYearData()</code> is only able to return one year at the time, which is not useful when we want to investigate changes overtime. Instead of duplicating any of the request/parsing/conversion logic, we built <code>combineYearData()</code> which calls <code>getSingleData()</code> one per request year and stacks the results together.</p>
-<p>This function has a couple of details worth to highlight. Each individual year’s tibble returns already tagged with the “census” class, but we strip that off before combining them. The <code>bind_rows()</code> does not need to know about a custom class, and re-tagging happens once, on the final combined result, rather than on each piece. We also attach a year column to each year’s data before stacking since once everything is combined there’s no way to know which rows came from which year. Finally, I convert year into a factor with its levels explicitly sorted, so that later when this combined data gets passed to <code>plot()</code> or <code>summary()</code>, years come out in chronological order rather than however <code>bind_rows()</code> stacked them.</p>
+<p>Our function <code>getSingleYearData()</code> is only able to return one year at the time which is not useful when we want to investigate changes overtime. Instead of duplicating any of the request/parsing/conversion logic, we built <code>combineYearData()</code> which calls <code>getSingleData()</code> one per request year and stacks the results together.</p>
+<p>This function has a couple of details worth to highlight. Each individual year’s tibble returns already tagged with the “census” class, but we strip that off before combining them. The <code>bind_rows()</code> does not need to know about a custom class and re-tagging happens once on the final combined result rather than on each piece. We also attach a year column to each year’s data before stacking since once everything is combined there’s no way to know which rows came from which year. Finally, I convert year into a factor with its levels explicitly sorted so that later when this combined data gets passed to <code>plot()</code> or <code>summary()</code>, years come out in chronological order rather than however <code>bind_rows()</code> stacked them.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>combineYearsData <span class="ot">&lt;-</span> <span class="cf">function</span>(years,</span>
 <span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>                              <span class="at">numeric_vars =</span> <span class="fu">c</span>(<span class="st">"AGEP"</span>),</span>
@@ -731,7 +731,7 @@ $`2`
 <span id="cb34-36"><a href="#cb34-36" aria-hidden="true" tabindex="-1"></a>  combined</span>
 <span id="cb34-37"><a href="#cb34-37" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>In testing this function the default arguments for <code>combineYearsData()</code> were written as <code>numeric_vars = c("AGEP", "PWGTP")</code> and <code>geo_level = "state"</code> (lowercase), both of which immediately fail when passed into <code>getSingleYearData()</code>. PWGTP is not a valid explicit choice for numeric_vars, as it is automatically added, and geo_level validation is case-sensitive.</p>
+<p>In testing this function the default arguments for <code>combineYearsData()</code> were written as <code>numeric_vars = c("AGEP", "PWGTP")</code> and <code>geo_level = "state"</code> (lowercase), both of which immediately fail when passed into <code>getSingleYearData()</code>. <code>PWGTP</code> is not a valid explicit choice for <code>numeric_vars</code> as it is automatically added and <code>geo_level</code> validation is case-sensitive</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>combined_test <span class="ot">&lt;-</span> <span class="fu">combineYearsData</span>(<span class="at">years =</span> <span class="fu">c</span>(<span class="dv">2024</span>, <span class="dv">2023</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stderr">
@@ -803,7 +803,7 @@ New names:
 <h2 class="anchored" data-anchor-id="part-2-write-a-generic-function-for-summarizing-data">Part 2: Write a Generic Function for Summarizing Data</h2>
 <section id="generic-functions" class="level3">
 <h3 class="anchored" data-anchor-id="generic-functions">Generic Functions</h3>
-<p>Before we start writing our customs summary() and plot() behavior from this data, it is good to understand how R works behind the screen and decides which version of a function to actually run. Given both <code>summary()</code> and <code>plot()</code> are genetic functions in R, meaning that they do not work by themselves, they need to look at the class of the object was passed in and dispatch to a class-specific method.</p>
+<p>Before we start writing our customs <code>summary()</code> and <code>plot()</code> behavior from this data it is good to understand how R works behind the screen and decides which version of a function to actually run. Given both <code>summary()</code> and <code>plot()</code> are genetic functions in R, meaning that they do not work by themselves they need to look at the class of the object was passed in and dispatch to a class-specific method.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb49"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a>plot.function                        <span class="co"># method used when class = "function"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
@@ -836,7 +836,7 @@ New names:
     curve(expr = x, from = from, to = to, xlim = xlim, ylab = ylab, 
         ...)
 }
-&lt;bytecode: 0x000002a261246310&gt;
+&lt;bytecode: 0x000001b7a3554a10&gt;
 &lt;environment: namespace:graphics&gt;</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb51"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a><span class="fu">getS3method</span>(<span class="st">"plot"</span>, <span class="st">"data.frame"</span>)    <span class="co"># method used when class = "data.frame"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -869,11 +869,11 @@ New names:
         pairs(data.matrix(x), ...)
     }
 }
-&lt;bytecode: 0x000002a26118ee78&gt;
+&lt;bytecode: 0x000001b7a36456d0&gt;
 &lt;environment: namespace:graphics&gt;</code></pre>
 </div>
 </div>
-<p>The generic function <code>plot()</code> calls <code>UseMethod("plot")</code> and then R chooses plot.function or plot.data.frame depending on the class of the argument. Since the tibbles returned by <code>getSingleYearData()</code> and <code>combineYearData()</code> are tagged to the “census” class, these defined the function named <code>summary.census</code> and <code>plot.census</code>, then if we use <code>summary(my_data)</code> and <code>plot(my_data)</code> to use them instead of just their default versions.</p>
+<p>The generic function <code>plot()</code> calls <code>UseMethod("plot")</code> and then R chooses <code>plot.function</code> or <code>plot.data.frame</code> depending on the class of the argument. Since the tibbles returned by <code>getSingleYearData()</code> and <code>combineYearData()</code> are tagged to the “census” class, these defined the function named <code>summary.census</code> and plot.census, then if we use <code>summary(my_data)</code> and <code>plot(my_data)</code> to use them instead of just their default versions.</p>
 </section>
 <section id="numeric-summaries" class="level3">
 <h3 class="anchored" data-anchor-id="numeric-summaries">Numeric Summaries</h3>
@@ -963,7 +963,7 @@ New names:
 • `` -&gt; `...6`</code></pre>
 </div>
 </div>
-<p>Calling <code>summary()</code> twice here demonstrates both branches of the function: once with no arguments, so it auto-detects every numeric and categorical column in the data, and once with to just <code>AGEP</code> and <code>SEX</code>, so only those two show up in the output.</p>
+<p>Calling <code>summary()</code>twice here demonstrates both branches of the function: once with no arguments, so it auto-detects every numeric and categorical column in the data, and once with to just `AGEP` and `SEX`, so only those two show up in the output.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb57"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(my_census_data)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
@@ -1206,7 +1206,7 @@ Asian and Pacific Island languages                     Other Language
                            4886345                             648047 </code></pre>
 </div>
 </div>
-<p>The raw weighted counts are not useful to compare across regions, for example since New York, Illinoins, North Carolina, and California do not have the same population. Since a region with more people will have larger counts in every <code>HHL</code> category regardless of its actual language mix, we solved that problem by converting each region’s count to proportions of its own total.</p>
+<p>The raw weighted counts are not useful to compare across regions. For example, since New York, Illinoins, North Carolina, and California do not have the same population. Since a region with more people will have larger counts in every <code>HHL</code> category regardless of its actual language mix, we solved that problem by converting each region’s count to proportions of its own total.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb67"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a><span class="co"># convert each region's weighted counts to proportions so regions with</span></span>
 <span id="cb67-2"><a href="#cb67-2" aria-hidden="true" tabindex="-1"></a><span class="co"># different total populations are directly comparable. tapply() (used</span></span>
@@ -1282,7 +1282,7 @@ Asian and Pacific Island languages                     Other Language
 </div>
 </div>
 <p>Age distribution by household language in the South group quarters/vacant households skew notably younger than other categories.</p>
-<p>To compare region against region directly rather than one region’s internal breakdown, the four separate <code>region_data</code> tibbles need to become one combined tibble with a <code>REGION</code> column which is the same class-strip-then-retag pattern used in <code>combineYearsData()</code>, just applied across region instead of year, and reusing data already pulled rather than making a fifth API call.</p>
+<p>To compare region against region directly rather than one region’s internal breakdown the four separate <code>region_data</code> tibbles need to become one combined tibble with a <code>REGION</code> column which is the same class-strip-then-retag pattern used in <code>combineYearsData()</code>, just applied across region instead of year, and reusing data already pulled rather than making a fifth API call.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb74"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb74-1"><a href="#cb74-1" aria-hidden="true" tabindex="-1"></a>all_regions <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(<span class="fu">lapply</span>(region_names, <span class="cf">function</span>(nm) {</span>
 <span id="cb74-2"><a href="#cb74-2" aria-hidden="true" tabindex="-1"></a>  one_region <span class="ot">&lt;-</span> region_data[[nm]]</span>
@@ -1325,7 +1325,7 @@ Asian and Pacific Island languages                     Other Language
                            6931717                            1530932 </code></pre>
 </div>
 </div>
-<p>Language spoken in households varies greatly on average by region (but not by age). The average age of the four regions ranges from 39.2 in the West to 40.7 in the Northeast, a difference of 1.5 years. That is a small difference, considering the standard deviation for each region is 23 years. The pooled mean for all four states is 39.77 years, right in the middle of that range.</p>
+<p>Language spoken in households varies greatly on average by region. The average age of the four regions ranges from 39.2 in the West to 40.7 in the Northeast, a difference of 1.5 years. That is a small difference considering the standard deviation for each region is 23 years. The pooled mean for all four states is 39.77 years right in the middle of that range.</p>
 <p>In the South, only English is spoken in 79.3% of households, but in the West, only English is spoken in 42.1% of households. The four states have an overall non-English primary share of 45.2%. This total is a population-weighted average, not a simple average of the four regional percentages (38.2%). The West’s combined total is higher, as it has a larger population and is also the most heavily non-English-speaking of the four states examined. These comparisons only work because the counts are weighted by the <code>PWGTP</code>. If they weren’t weighted, we would be counting the number of rows sampled in each state, not the number of people.</p>
 
 
