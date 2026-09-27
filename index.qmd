@@ -61,7 +61,7 @@ This project works with a subset of the American Community Survey PUMS variables
 
 Most of the categorical variables in this dataset do not come back from the API as significant values, so before we start working with this data we needed to find a way to translate those codes into actual labels. The Census API exposes a `variables.json` endpoint for each year that maps every variable's code to human readable variables.
 
-Since the API was an inconsistent way to nest some variables such like code-to-label mapping is plain named list and others have an extra mapping inside an extra list layer named item. We built extractItemLabels objective is to normalize it and checks for one level of item nesting, then checks again for a second level, so every variable ends up with the same flat code-to-label structure by the time the rest of the code touches it.
+Since the API was an inconsistent way to nest some variables such like code-to-label mapping is plain named list and others have an extra mapping inside an extra list layer named item. We built extractItemLabels objective is to normalize it and checks for one level of item nesting then checks again for a second level so every variable ends up with the same flat code-to-label structure by the time the rest of the code touches it.
 
 ```{r extract-item-labels}
 # Census variables.json nests value labels under a list named "item"
@@ -83,7 +83,7 @@ extractItemLabels <- function(values) {
 }
 ```
 
-`getVariableValues()` builds the dictionary for a given year. First, the API renamed the state geography variable since it is set to `ST` for 2021 and 2022 dictionaries, but `STATE` from 2023 on, we have the function to choose the right name based on year before it can even ask for the variable's labels. Second, we only request the dictionary entries for the variables in the project uses (`vars_needed`), rather than extracting the entire dictionary. Also, we parsed the response with `simplyVector = FALSE`, since jsonlite's default simplification collapses the required nested list structure that extractItemLabels() needs to revise. Otherwise, the item wrapper gets flattened away before we get an opportunity to detect it.
+`getVariableValues()` builds the dictionary for a given year. First, the API renamed the state geography variable since it is set to `ST` for 2021 and 2022 dictionaries, but `STATE` from 2023 on we have the function to choose the right name based on year before it can even ask for the variable's labels. Second, we only request the dictionary entries for the variables in the project uses (`vars_needed`) rather than extracting the entire dictionary. Also, we parsed the response with `simplyVector = FALSE`, since jsonlite's default simplification collapses the required nested list structure that extractItemLabels() needs to revise. Otherwise, the item wrapper gets flattened away before we get an opportunity to detect it.
 
 ```{r get-variable-values}
 getVariableValues <- function(year) {
@@ -117,7 +117,7 @@ getVariableValues <- function(year) {
 }
 ```
 
-Since a given year's variable dictionary does not change, there is no reason to send another request from the API every time this document gets knit. Then, this chunk builds a dictionary for all four years and saves it to disk as an `.rds` file, and it will only run at all if that file does not already exits.
+Since a given year's variable dictionary does not change there is no reason to send another request from the API every time this document gets knit. Then, this chunk builds a dictionary for all four years and saves it to disk as an `.rds` file, and it will only run at all if that file does not already exits.
 
 ```{r cache-variable-values}
 # Build the variable dictionary once per year and cache it to disk, so we
@@ -133,7 +133,7 @@ if (!file.exists("data/variable_values.rds")) {
 }
 ```
 
-The function below is what we used for the entire of the project, it reads the cached dictionary back off disk and returns the portion for one specific year. In this way the `getSingleVariableYear` and the conversation functions never needs to know anything about how the dictionary was built or cached.
+The function below is what we used for the entire of the project it reads the cached dictionary back off disk and returns the portion for one specific year. In this way the `getSingleVariableYear` and the conversation functions never needs to know anything about how the dictionary was built or cached.
 
 ```{r load-variable-values}
 # Loads the cached dictionary for one year a list of code = label
@@ -176,7 +176,7 @@ test_response <- GET(census_url)
 status_code(test_response)
 ```
 
-That previous return needed its own function from `JSON()`, which parses the API response into a plain R matrix (not even a dataframe). We used the `response_to_tibble()` to convert a matrix in an easy readable tibble, which shows the first row to actual column names and drops it, returning what as users consider tabular data. Since the request is working, the next step was to build `getSingleYearData()`, starting with validating each argument before it is ever used to build a request.
+That previous return needed its own function from `JSON()`, which parses the API response into a plain R matrix (not even a dataframe). We used the `response_to_tibble()` to convert a matrix in an eligible tibble revealing the first row to actual column names and drops it returning what as users consider tabular data. Since the request is working the next step was to build `getSingleYearData()`, starting with validating each argument before it is ever used to build a request.
 
 ```{r response-to-tibble}
 response_to_tibble <- function(response) {
@@ -231,7 +231,7 @@ if (length(numeric_vars) < 2) {
 }
 ```
 
-There are two numeric variables, `JWAP` and `JWDP` that do not come back directly as numbers, instead they returned as coded time-range variables like "12:00pm to 12:05pm". In order to convert this into a simple single numeric value, we took the midpoint of each range and returned it as a time-of-day value using the `library(hms)`. For those labels that show that the person does not have an applicable arrival/departure time come back as NA instead of a formatted time.
+There are two numeric variables, `JWAP` and `JWDP` that do not come back directly as numbers, instead they returned as coded time-range variables like "12:00pm to 12:05pm". In order to convert this into a simple single numeric value we took the midpoint of each range and returned it as a time-of-day value using the `library(hms)`. For those labels that show that the person does not have an applicable arrival/departure time come back as NA instead of a formatted time.
 
 ```{r get-time-midpoint}
 
@@ -254,7 +254,7 @@ getTimeMidpoint("12:00 p.m. to 12:04 p.m.")
 getTimeMidpoint("N/A (not a worker; worker who worked from home)")
 ```
 
-The function covertNumericVar() decides per each column, whether a variable needs a time-midpoint calculation or just needs to be forced to a plain number. For example, with the API's "N" not-applicable code converted to a NA first.
+The function `covertNumericVar()` decides per each column whether a variable needs a time-midpoint calculation or just needs to be forced to a plain number. For example, with the API's "N" not-applicable code converted to a NA first.
 
 ```{r convert-numeric-var}
 # applies the right conversion to one requested numeric column: JWAP/JWDP
@@ -275,7 +275,7 @@ convertNumericVar <- function(values, var_name, var_values) {
 }
 ```
 
-We also needed to check for categorical variables go through the same two part validation, given that we needed to restrict to an allowed list, with at least one required `SEX` is just a sensible default. Unlike `PWFTP`, there is no categorical variable that gets force-included.
+We also needed to check for categorical variables go through the same two part validation, given that we needed to restrict to an allowed list with at least one required `SEX` is just a sensible default. Unlike `PWFTP`, there is no categorical variable that gets force-included.
 
 ```{r check-categorical-vars}
 # specify categorical variables to return
@@ -320,7 +320,7 @@ if (length(geo_level) != 1 || !geo_level %in% allowed_geo_levels) {
 }
 ```
 
-Here is when I wanted to throw my laptop from the window. There is this `ST/STATE` name inconsistency, this time for validating the actual geography codes rather than just building the URL. The dictionary key for state-level data is ST in 2021 and 2022 and STATE from 2023 onward. Unlike geo_level and geo_values, we can allow all as a special case, which ignores the dictionary validation completely rather than trying to match it against all the codes.
+Here is when I wanted to throw my laptop from the window. There is this `ST/STATE` name inconsistency, this time for validating the actual geography codes rather than just building the URL. The dictionary key for state-level data is `ST` in 2021 and 2022 and `STATE` from 2023 onward. Unlike `geo_level` and geo_values, we can allow all as a special case, which ignores the dictionary validation completely rather than trying to match it against all the codes.
 
 ```{r check-geo-value}
 # default geography value. example default is a single State
@@ -346,7 +346,7 @@ if (!identical(geo_values, "all")) {
 }
 ```
 
-After every piece validated individually above, we created `getSingleYearData()` which assembles all of it into one big function. Build the request URL from the validated inputs, send it parse the response into a tibble, convert each column to its proper type, and tag the result with a "census" class so the custom `summary()/plot()` methods we built in Part 2 know how to handle it.
+After every piece validated individually above, we created `getSingleYearData(`) which assembles all of it into one big function. Build the request URL from the validated inputs, send it parse the response into a tibble, convert each column to its proper type, and tag the result with a "census" class so the custom `summary()/plot()` methods we built in Part 2 know how to handle it.
 
 ```{r get-single-year-data}
 getSingleYearData <- function(year = 2024,
@@ -473,9 +473,9 @@ tryCatch(
 
 ### Combining Years
 
-Our function `getSingleYearData()` is only able to return one year at the time, which is not useful when we want to investigate changes overtime. Instead of duplicating any of the request/parsing/conversion logic, we built `combineYearData()` which calls `getSingleData()` one per request year and stacks the results together.
+Our function `getSingleYearData()` is only able to return one year at the time which is not useful when we want to investigate changes overtime. Instead of duplicating any of the request/parsing/conversion logic, we built `combineYearData()` which calls `getSingleData()` one per request year and stacks the results together.
 
-This function has a couple of details worth to highlight. Each individual year's tibble returns already tagged with the "census" class, but we strip that off before combining them. The `bind_rows()` does not need to know about a custom class, and re-tagging happens once, on the final combined result, rather than on each piece. We also attach a year column to each year's data before stacking since once everything is combined there's no way to know which rows came from which year. Finally, I convert year into a factor with its levels explicitly sorted, so that later when this combined data gets passed to `plot()` or `summary()`, years come out in chronological order rather than however `bind_rows()` stacked them.
+This function has a couple of details worth to highlight. Each individual year's tibble returns already tagged with the "census" class, but we strip that off before combining them. The `bind_rows()` does not need to know about a custom class and re-tagging happens once on the final combined result rather than on each piece. We also attach a year column to each year's data before stacking since once everything is combined there's no way to know which rows came from which year. Finally, I convert year into a factor with its levels explicitly sorted so that later when this combined data gets passed to `plot()` or `summary()`, years come out in chronological order rather than however `bind_rows()` stacked them.
 
 ```{r combine-years-data}
 combineYearsData <- function(years,
@@ -517,7 +517,7 @@ combineYearsData <- function(years,
 }
 ```
 
-In testing this function the default arguments for `combineYearsData()` were written as `numeric_vars = c("AGEP", "PWGTP")` and `geo_level = "state"` (lowercase), both of which immediately fail when passed into `getSingleYearData()`. PWGTP is not a valid explicit choice for numeric_vars, as it is automatically added, and geo_level validation is case-sensitive.
+In testing this function the default arguments for `combineYearsData()` were written as `numeric_vars = c("AGEP", "PWGTP")` and `geo_level = "state"` (lowercase), both of which immediately fail when passed into `getSingleYearData()`. `PWGTP` is not a valid explicit choice for `numeric_vars` as it is automatically added and `geo_level` validation is case-sensitive
 
 ```{r test-combine-valid}
 combined_test <- combineYearsData(years = c(2024, 2023))
@@ -550,14 +550,14 @@ nrow(dup_test)
 
 ### Generic Functions
 
-Before we start writing our customs summary() and plot() behavior from this data, it is good to understand how R works behind the screen and decides which version of a function to actually run. Given both `summary()` and `plot()` are genetic functions in R, meaning that they do not work by themselves, they need to look at the class of the object was passed in and dispatch to a class-specific method.
+Before we start writing our customs `summary()` and `plot()` behavior from this data it is good to understand how R works behind the screen and decides which version of a function to actually run. Given both `summary()` and `plot()` are genetic functions in R, meaning that they do not work by themselves they need to look at the class of the object was passed in and dispatch to a class-specific method.
 
 ```{r explore-generic-dispatch}
 plot.function                        # method used when class = "function"
 getS3method("plot", "data.frame")    # method used when class = "data.frame"
 ```
 
-The generic function `plot()` calls `UseMethod("plot")` and then R chooses plot.function or plot.data.frame depending on the class of the argument. Since the tibbles returned by `getSingleYearData()` and `combineYearData()` are tagged to the "census" class, these defined the function named `summary.census` and `plot.census`, then if we use `summary(my_data)` and `plot(my_data)` to use them instead of just their default versions.
+The generic function `plot()` calls `UseMethod("plot")` and then R chooses `plot.function` or `plot.data.frame` depending on the class of the argument. Since the tibbles returned by `getSingleYearData()` and `combineYearData()` are tagged to the "census" class, these defined the function named `summary.census` and plot.census, then if we use `summary(my_data)` and `plot(my_data)` to use them instead of just their default versions.
 
 ### Numeric Summaries
 
@@ -643,7 +643,7 @@ my_census_data <- getSingleYearData(
 )
 ```
 
-Calling `summary()` twice here demonstrates both branches of the function: once with no arguments, so it auto-detects every numeric and categorical column in the data, and once with to just `AGEP` and `SEX`, so only those two show up in the output.
+Calling `summary()`twice here demonstrates both branches of the function: once with no arguments, so it auto-detects every numeric and categorical column in the data, and once with to just \`AGEP\` and \`SEX\`, so only those two show up in the output.
 
 ```{r summarize-example-data}
 summary(my_census_data)
@@ -700,7 +700,7 @@ region_summaries <- lapply(region_data, summary, categorical_vars = "HHL")
 region_summaries
 ```
 
-The raw weighted counts are not useful to compare across regions, for example since New York, Illinoins, North Carolina, and California do not have the same population. Since a region with more people will have larger counts in every `HHL` category regardless of its actual language mix, we solved that problem by converting each region's count to proportions of its own total.
+The raw weighted counts are not useful to compare across regions. For example, since New York, Illinoins, North Carolina, and California do not have the same population. Since a region with more people will have larger counts in every `HHL` category regardless of its actual language mix, we solved that problem by converting each region's count to proportions of its own total.
 
 ```{r hhl-proportions}
 # convert each region's weighted counts to proportions so regions with
@@ -737,7 +737,7 @@ plot(region_data$South, cat_var = "HHL", num_var = "AGEP")
 
 Age distribution by household language in the South group quarters/vacant households skew notably younger than other categories.
 
-To compare region against region directly rather than one region's internal breakdown, the four separate `region_data` tibbles need to become one combined tibble with a `REGION` column which is the same class-strip-then-retag pattern used in `combineYearsData()`, just applied across region instead of year, and reusing data already pulled rather than making a fifth API call.
+To compare region against region directly rather than one region's internal breakdown the four separate `region_data` tibbles need to become one combined tibble with a `REGION` column which is the same class-strip-then-retag pattern used in `combineYearsData()`, just applied across region instead of year, and reusing data already pulled rather than making a fifth API call.
 
 ```{r combine-all-regions}
 all_regions <- bind_rows(lapply(region_names, function(nm) {
@@ -756,6 +756,6 @@ plot(all_regions, cat_var = "REGION", num_var = "AGEP")
 summary(all_regions, categorical_vars = "HHL")
 ```
 
-Language spoken in households varies greatly on average by region (but not by age). The average age of the four regions ranges from 39.2 in the West to 40.7 in the Northeast, a difference of 1.5 years. That is a small difference, considering the standard deviation for each region is 23 years. The pooled mean for all four states is 39.77 years, right in the middle of that range.
+Language spoken in households varies greatly on average by region. The average age of the four regions ranges from 39.2 in the West to 40.7 in the Northeast, a difference of 1.5 years. That is a small difference considering the standard deviation for each region is 23 years. The pooled mean for all four states is 39.77 years right in the middle of that range.
 
 In the South, only English is spoken in 79.3% of households, but in the West, only English is spoken in 42.1% of households. The four states have an overall non-English primary share of 45.2%. This total is a population-weighted average, not a simple average of the four regional percentages (38.2%). The West’s combined total is higher, as it has a larger population and is also the most heavily non-English-speaking of the four states examined. These comparisons only work because the counts are weighted by the `PWGTP`. If they weren’t weighted, we would be counting the number of rows sampled in each state, not the number of people.
